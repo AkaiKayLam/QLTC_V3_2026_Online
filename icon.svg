@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#0f766e"/>
+  <!-- Outer coin ring -->
+  <circle cx="256" cy="256" r="230" fill="#d4a017" stroke="#b8860b" stroke-width="12"/>
+  <!-- Inner coin -->
+  <circle cx="256" cy="256" r="200" fill="#f0c14b"/>
+  <!-- Subtle inner ring -->
+  <circle cx="256" cy="256" r="185" fill="none" stroke="#e0b040" stroke-width="6"/>
+  <!-- Card background -->
+  <rect x="146" y="170" width="220" height="150" rx="18" ry="18" fill="#0f4c5c"/>
+  <!-- Card top stripe -->
+  <rect x="146" y="170" width="220" height="36" rx="18" ry="18" fill="#0a3a47"/>
+  <rect x="146" y="188" width="220" height="18" fill="#0a3a47"/>
+  <!-- Horizontal line on card -->
+  <rect x="170" y="230" width="140" height="8" rx="4" fill="#2a6f7a"/>
+  <!-- Bar chart -->
+  <rect x="175" y="270" width="22" height="28" rx="4" fill="#f0c14b"/>
+  <rect x="210" y="250" width="22" height="48" rx="4" fill="#f0c14b"/>
+  <rect x="245" y="235" width="22" height="63" rx="4" fill="#f0c14b"/>
+  <!-- HP badge -->
+  <circle cx="340" cy="300" r="38" fill="#f0c14b" stroke="#d4a017" stroke-width="5"/>
+  <text x="340" y="310" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#0f4c5c" text-anchor="middle">HP</text>
+</svg>

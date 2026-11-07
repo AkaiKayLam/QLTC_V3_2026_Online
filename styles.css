@@ -1,0 +1,99 @@
+*{box-sizing:border-box}
+body{margin:0;background:#f1f7f6;color:#17212b;font:14px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+.topbar{background:#087b72;color:white;padding:12px 4vw;display:flex;justify-content:space-between;align-items:center}
+.topbar small{opacity:.8;letter-spacing:.06em;font-size:11px}
+.topbar h1{font-size:18px;margin:2px 0}
+main{max-width:900px;margin:auto;padding:12px 3vw 24px}
+.hidden{display:none!important}
+.panel,.summary-grid article{background:white;border:1px solid #dce6e4;border-radius:14px;padding:12px;margin:10px 0;box-shadow:0 1px 6px #1231}
+.narrow{max-width:520px;margin:20px auto}
+.summary-grid{display:flex;flex-direction:column;gap:8px}
+.summary-grid article{margin:0;padding:10px 12px;display:flex;justify-content:space-between;align-items:center}
+.summary-grid span{color:#64716f;font-size:12px}
+.summary-grid strong{font-size:16px;overflow-wrap:anywhere}
+.tabs{display:flex;overflow:auto;gap:4px;margin:14px 0 10px;border-bottom:1px solid #d4dfdd;padding-bottom:0}
+.tab{white-space:nowrap;border:0;background:transparent;padding:9px 10px;color:#5b6967;font-weight:700;font-size:12px}
+.tab.active{color:#087b72;border-bottom:3px solid #087b72}
+.section-heading{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:12px 0}
+.section-heading h2{margin:0;font-size:18px}
+.section-heading p{margin:2px 0;color:#6a7775;font-size:12px}
+.primary,.secondary,.tiny{border:0;border-radius:10px;padding:9px 12px;font-weight:700;font-size:13px;cursor:pointer}
+.primary{background:#087b72;color:white}
+.secondary{background:#e6f2f0;color:#075e58}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-grid h3{margin:0;font-size:15px}
+.form-grid label,.narrow label,.backup-panel label{display:flex;flex-direction:column;gap:5px;font-weight:650;color:#3d4b49;font-size:12px}
+.form-grid input,.form-grid select,.narrow input,.backup-panel input,.search{width:100%;min-width:0;border:1px solid #cbd7d5;border-radius:10px;padding:10px;font:inherit;background:white;color:#17212b;font-size:13px}
+.wide{grid-column:1/-1}
+.form-actions{display:flex;justify-content:flex-end;gap:8px}
+.input-wrap{display:flex;align-items:center;gap:4px;border:1px solid #cbd7d5;border-radius:10px;background:white;padding-right:4px}
+.input-wrap input{border:0!important;outline:0;flex:1;min-width:0}
+.peek,.clear{border:0;background:#e8f3f1;color:#075e58;border-radius:7px;padding:6px 8px;font-weight:700;font-size:12px}
+.clear{font-size:16px}
+.list{padding:6px 12px}
+.list-row{display:flex;align-items:center;gap:8px;padding:10px 2px;border-bottom:1px solid #edf1f0;font-size:13px}
+.list-row:last-child{border:0}
+.grow{flex:1;min-width:0}
+.list-row small{display:block;color:#697572;font-size:11px;margin-top:2px;overflow-wrap:anywhere}
+.amount{white-space:nowrap;font-size:13px}
+.income{color:#087b55}
+.expense{color:#bd433b}
+.actions{display:flex;gap:4px}
+.tiny{padding:5px 7px;background:#e8f3f1;color:#075e58;font-size:11px}
+.tiny.danger{background:#fff0ee;color:#a32d27}
+.empty{text-align:center;color:#75817f;padding:18px 8px;font-size:13px}
+.search{margin:0 0 10px}
+.budget-item{padding:10px 4px;border-bottom:1px solid #edf1f0}
+.row-between{display:flex;justify-content:space-between;align-items:center}
+.progress{height:8px;background:#e9efee;border-radius:16px;overflow:hidden;margin:6px 0}
+.progress i{display:block;height:100%;background:#0b9487;border-radius:16px}
+.warning{color:#b45309;font-weight:700}
+.backup-panel hr{border:0;border-top:1px solid #e5ecea;margin:16px 0}
+.privacy-note{text-align:center;color:#687673;font-size:11px;margin:16px 0}
+.message{background:#173f3b;color:white;border-radius:10px;padding:10px 14px;position:sticky;bottom:8px;font-size:13px}
+.error{color:#b42318;font-size:12px}
+footer{text-align:center;color:#7b8785;padding:10px;font-size:11px}
+.btn-group{display:flex;gap:6px;flex-wrap:wrap}
+.load-more{text-align:center;padding:10px 0 4px}
+.load-more button{min-width:160px}
+.debt-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.debt-summary article{background:white;border:1px solid #dce6e4;border-radius:12px;padding:10px 12px}
+.debt-summary span{display:block;color:#64716f;font-size:11px}
+.debt-summary strong{display:block;margin-top:3px;font-size:15px}
+.transfer-tag{display:inline-block;background:#e0f2fe;color:#0369a1;font-size:10px;padding:1px 5px;border-radius:5px;margin-left:3px;font-weight:700}
+.debt-tag{display:inline-block;font-size:10px;padding:1px 5px;border-radius:5px;margin-left:3px;font-weight:700}
+.debt-tag.lend{background:#dcfce7;color:#166534}
+.debt-tag.borrow{background:#fee2e2;color:#991b1b}
+.backup-panel h3{margin:14px 0 6px;font-size:14px}
+.day-sep{background:#e8f3f1;color:#075e58;font-weight:700;font-size:12px;padding:6px 10px;margin:8px -12px 0;border-radius:0}
+.day-sep:first-child{margin-top:0}
+.neg-bal{color:#b42318!important;font-weight:700}
+.neg-bal::after{content:" ⚠ SOS";font-size:11px}
+.search-bar{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;margin-bottom:10px;align-items:end}
+.search-bar label{font-size:11px;font-weight:650;color:#3d4b49}
+.search-bar input,.search-bar select{padding:8px;font-size:12px;border-radius:8px;border:1px solid #cbd7d5}
+.chart-wrap{background:white;border:1px solid #dce6e4;border-radius:14px;padding:12px;margin:10px 0}
+.chart-bar{display:flex;align-items:center;gap:8px;margin:4px 0;font-size:12px}
+.chart-bar .label{width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chart-bar .bar{flex:1;height:14px;background:#e9efee;border-radius:8px;overflow:hidden}
+.chart-bar .bar i{display:block;height:100%;border-radius:8px}
+.chart-bar .bar.inc i{background:#0b9487}
+.chart-bar .bar.exp i{background:#bd433b}
+.chart-bar .val{width:70px;text-align:right;font-weight:700;font-size:11px}
+.cat-group{font-size:11px;color:#64716f;margin:8px 0 2px;font-weight:700}
+@media(max-width:560px){
+  main{padding:10px 3vw}
+  .summary-grid strong{font-size:14px}
+  .form-grid{grid-template-columns:1fr}
+  .wide{grid-column:auto}
+  .section-heading{align-items:flex-start}
+  .section-heading h2{font-size:16px}
+  .list-row{flex-wrap:wrap}
+  .list-row .actions{margin-left:auto}
+  .tabs .tab{padding:8px 8px;font-size:11px}
+  .search-bar{grid-template-columns:1fr 1fr}
+  .btn-group{width:100%}
+  .btn-group .primary,.btn-group .secondary{flex:1}
+  .debt-summary{grid-template-columns:1fr}
+  .chart-bar .label{width:80px}
+}

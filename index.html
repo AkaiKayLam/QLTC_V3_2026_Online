@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f766e"><meta name="description" content="Quản lý tài chính cá nhân offline">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon-192.png"><link rel="stylesheet" href="./styles.css">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://apis.google.com/js/api.js" async defer></script>
+<title>Tài chính cá nhân</title>
+</head><body>
+<header class="topbar"><div><small>LOCAL-FIRST · OFFLINE</small><h1>Tài chính cá nhân</h1></div><button id="lockBtn" class="secondary hidden">Khóa</button></header>
+<main>
+<section id="setupPanel" class="panel narrow hidden"><h2>Tạo kho dữ liệu</h2><p>Đặt PIN số từ 4 chữ số trở lên. PIN dùng để mã hóa dữ liệu trên thiết bị. Nếu quên PIN, không thể giải mã dữ liệu nếu không có bản sao lưu và PIN đúng.</p>
+<form id="setupForm"><label>PIN chính<div class="input-wrap"><input id="setupPassword" type="password" inputmode="numeric" pattern="[0-9]{4,}" minlength="4" autocomplete="new-password" required placeholder="Ít nhất 4 chữ số"><button type="button" class="peek" data-target="setupPassword">Hiện</button><button type="button" class="clear" data-target="setupPassword">×</button></div></label>
+<label>Nhập lại PIN<div class="input-wrap"><input id="setupPassword2" type="password" inputmode="numeric" pattern="[0-9]{4,}" minlength="4" required><button type="button" class="peek" data-target="setupPassword2">Hiện</button><button type="button" class="clear" data-target="setupPassword2">×</button></div></label><button class="primary">Tạo kho dữ liệu</button></form></section>
+<section id="unlockPanel" class="panel narrow hidden"><h2>Mở khóa</h2><form id="unlockForm"><label>PIN<div class="input-wrap"><input id="unlockPassword" type="password" inputmode="numeric" autocomplete="current-password" required><button type="button" class="peek" data-target="unlockPassword">Hiện</button><button type="button" class="clear" data-target="unlockPassword">×</button></div></label><button class="primary">Mở khóa</button></form><p id="unlockError" class="error"></p></section>
+<section id="appPanel" class="hidden">
+<div class="summary-grid">
+  <article><span>Tổng thu</span><strong id="incomeTotal">0 ₫</strong></article>
+  <article><span>Tổng chi</span><strong id="expenseTotal">0 ₫</strong></article>
+  <article><span>Số dư ròng</span><strong id="netTotal">0 ₫</strong></article>
+</div>
+<nav class="tabs">
+  <button class="tab active" data-tab="accounts">Tài khoản</button>
+  <button class="tab" data-tab="transactions">Giao dịch</button>
+  <button class="tab" data-tab="debts">Vay nợ</button>
+  <button class="tab" data-tab="stats">Thống kê</button>
+  <button class="tab" data-tab="budgets">Hạn mức</button>
+  <button class="tab" data-tab="categories">Danh mục</button>
+  <button class="tab" data-tab="backup">Sao lưu</button>
+  <button class="tab" data-tab="settings">Cài đặt</button>
+</nav>
+
+<!-- TÀI KHOẢN -->
+<section id="accountsView" class="view">
+  <div class="section-heading"><div><h2>Tài khoản & ví</h2><p>Tiền mặt, ngân hàng, ví điện tử</p></div><button id="addAccountBtn" class="primary">＋ Thêm</button></div>
+  <form id="accountForm" class="panel form-grid hidden"><h3 id="accountFormTitle" class="wide">Thêm tài khoản</h3><input id="accountId" type="hidden">
+  <label>Tên<input id="accountName" required maxlength="60" placeholder="Ví dụ: Ví chính"></label>
+  <label>Loại<select id="accountType"><option>Tiền mặt</option><option>VCB</option><option>TCB</option><option>MBB</option><option>Ví khác</option><option>Vay nợ</option></select></label>
+  <div class="form-actions wide"><button type="button" id="cancelAccountBtn" class="secondary">Hủy</button><button class="primary">Lưu</button></div></form>
+  <input id="accountSearch" class="search" placeholder="Tìm tài khoản hoặc ví...">
+  <div id="accountList" class="list panel"></div>
+</section>
+
+<!-- GIAO DỊCH -->
+<section id="transactionsView" class="view hidden">
+  <div class="section-heading">
+    <div><h2>Giao dịch</h2><p>Thu nhập, chi tiêu và chuyển khoản</p></div>
+    <div class="btn-group">
+      <button id="addTransferBtn" class="secondary">⇄ Chuyển</button>
+      <button id="addTransactionBtn" class="primary">＋ Thêm</button>
+    </div>
+  </div>
+  <div class="search-bar panel" style="padding:10px">
+    <label>Từ khóa<input id="txSearchKw" placeholder="Ghi chú, danh mục..."></label>
+    <label>Từ ngày<input id="txSearchFrom" type="date"></label>
+    <label>Đến ngày<input id="txSearchTo" type="date"></label>
+    <button type="button" id="txSearchBtn" class="primary" style="padding:8px 12px">Tìm</button>
+  </div>
+  <form id="transactionForm" class="panel form-grid hidden">
+    <h3 id="txFormTitle" class="wide">Thêm giao dịch</h3>
+    <input id="txId" type="hidden">
+    <label>Loại<select id="txType"><option value="EXPENSE">Chi tiêu</option><option value="INCOME">Thu nhập</option></select></label>
+    <label>Số tiền (VND)<div class="input-wrap"><input id="txAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 1.234.567"><button type="button" class="clear" data-target="txAmount">×</button></div></label>
+    <label>Ngày<input id="txDate" type="date" required></label>
+    <label>Tài khoản<select id="txAccount" required></select></label>
+    <label>Danh mục<select id="txCategory" required></select></label>
+    <label class="wide">Ghi chú<input id="txNote" maxlength="250" placeholder="Không bắt buộc"></label>
+    <div class="form-actions wide"><button type="button" id="cancelTransactionBtn" class="secondary">Hủy</button><button class="primary">Lưu giao dịch</button></div>
+  </form>
+  <form id="transferForm" class="panel form-grid hidden">
+    <h3 class="wide">Chuyển khoản giữa ví</h3>
+    <label>Từ tài khoản<select id="tfFrom" required></select></label>
+    <label>Sang tài khoản<select id="tfTo" required></select></label>
+    <label>Số tiền (VND)<div class="input-wrap"><input id="tfAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 500.000"><button type="button" class="clear" data-target="tfAmount">×</button></div></label>
+    <label>Ngày<input id="tfDate" type="date" required></label>
+    <label class="wide">Ghi chú<input id="tfNote" maxlength="250" placeholder="Không bắt buộc"></label>
+    <div class="form-actions wide"><button type="button" id="cancelTransferBtn" class="secondary">Hủy</button><button class="primary">Thực hiện chuyển</button></div>
+  </form>
+  <div id="transactionList" class="list panel"></div>
+  <div id="loadMoreWrap" class="load-more hidden"><button id="loadMoreBtn" class="secondary">Hiển thị thêm</button></div>
+</section>
+
+<!-- VAY NỢ -->
+<section id="debtsView" class="view hidden">
+  <div class="section-heading">
+    <div><h2>Vay nợ & cho vay</h2><p>Theo dõi khoản vay, cho vay và trả nợ</p></div>
+    <button id="addDebtBtn" class="primary">＋ Thêm khoản</button>
+  </div>
+  <div class="debt-summary">
+    <article><span>Đang cho vay</span><strong id="lendTotal">0 ₫</strong></article>
+    <article><span>Đang nợ</span><strong id="borrowTotal">0 ₫</strong></article>
+  </div>
+  <form id="debtForm" class="panel form-grid hidden">
+    <h3 id="debtFormTitle" class="wide">Thêm khoản vay / cho vay</h3>
+    <input id="debtId" type="hidden">
+    <label>Loại<select id="debtType"><option value="CHO_VAY">Cho vay (người khác nợ mình)</option><option value="VAY">Vay nợ (mình nợ người khác)</option></select></label>
+    <label>Người liên quan<input id="debtPerson" required maxlength="80" placeholder="Tên người / tổ chức"></label>
+    <label>Số tiền (VND)<div class="input-wrap"><input id="debtAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 2.000.000"><button type="button" class="clear" data-target="debtAmount">×</button></div></label>
+    <label>Tài khoản ví liên quan<select id="debtAccount" required></select></label>
+    <label>Ngày<input id="debtDate" type="date" required></label>
+    <label class="wide">Ghi chú<input id="debtNote" maxlength="250" placeholder="Không bắt buộc"></label>
+    <div class="form-actions wide"><button type="button" id="cancelDebtBtn" class="secondary">Hủy</button><button class="primary">Lưu khoản</button></div>
+  </form>
+  <form id="repayForm" class="panel form-grid hidden">
+    <h3 class="wide">Ghi nhận trả / thu nợ</h3>
+    <input id="repayDebtId" type="hidden">
+    <p id="repayInfo" class="wide" style="margin:0;color:#5b6967;font-size:12px"></p>
+    <label>Số tiền trả/thu (VND)<div class="input-wrap"><input id="repayAmount" inputmode="numeric" autocomplete="off" required><button type="button" class="clear" data-target="repayAmount">×</button></div></label>
+    <label>Tài khoản ví<select id="repayAccount" required></select></label>
+    <label>Ngày<input id="repayDate" type="date" required></label>
+    <label class="wide">Ghi chú<input id="repayNote" maxlength="250" placeholder="Không bắt buộc"></label>
+    <div class="form-actions wide"><button type="button" id="cancelRepayBtn" class="secondary">Hủy</button><button class="primary">Xác nhận</button></div>
+  </form>
+  <div id="debtList" class="list panel"></div>
+</section>
+
+<!-- THỐNG KÊ -->
+<section id="statsView" class="view hidden">
+  <div class="section-heading"><div><h2>Thống kê thu chi</h2><p>Theo danh mục trong khoảng thời gian</p></div></div>
+  <div class="panel form-grid">
+    <label>Từ ngày<input id="statsFrom" type="date"></label>
+    <label>Đến ngày<input id="statsTo" type="date"></label>
+    <label>Chế độ<select id="statsMode"><option value="range">Theo khoảng ngày</option><option value="year">Theo năm</option></select></label>
+    <label id="statsYearWrap" class="hidden">Năm<input id="statsYear" type="number" min="2020" max="2035" step="1"></label>
+    <div class="form-actions wide"><button id="statsRunBtn" class="primary">Xem thống kê</button></div>
+  </div>
+  <div class="chart-wrap">
+    <h3 style="margin:0 0 8px;font-size:14px">Chi tiêu theo danh mục</h3>
+    <div id="statsExpenseChart"></div>
+  </div>
+  <div class="chart-wrap">
+    <h3 style="margin:0 0 8px;font-size:14px">Thu nhập theo danh mục</h3>
+    <div id="statsIncomeChart"></div>
+  </div>
+</section>
+
+<!-- HẠN MỨC -->
+<section id="budgetsView" class="view hidden">
+  <div class="section-heading"><div><h2>Hạn mức chi tiêu</h2><p>Theo dõi ngân sách tháng hiện tại</p></div></div>
+  <form id="budgetForm" class="panel form-grid"><label>Danh mục<select id="budgetCategory"></select></label><label>Hạn mức tháng (VND)<input id="budgetAmount" inputmode="numeric" placeholder="Ví dụ: 5.000.000" required></label><div class="form-actions wide"><button class="primary">Lưu hạn mức</button></div></form>
+  <div id="budgetList" class="list panel"></div>
+</section>
+
+<!-- DANH MỤC -->
+<section id="categoriesView" class="view hidden">
+  <div class="section-heading"><div><h2>Danh mục</h2><p>Quản lý danh mục thu và chi</p></div><button id="addCategoryBtn" class="primary">＋ Thêm</button></div>
+  <form id="categoryForm" class="panel form-grid hidden"><h3 class="wide">Thêm danh mục</h3><label>Tên danh mục<input id="categoryName" required maxlength="50"></label><label>Loại<select id="categoryType"><option value="EXPENSE">Chi tiêu</option><option value="INCOME">Thu nhập</option></select></label><div class="form-actions wide"><button type="button" id="cancelCategoryBtn" class="secondary">Hủy</button><button class="primary">Lưu</button></div></form>
+  <div id="categoryList" class="list panel"></div>
+</section>
+
+<!-- SAO LƯU -->
+<section id="backupView" class="view hidden">
+  <div class="panel backup-panel">
+    <h2>Sao lưu & khôi phục</h2>
+    <p>File sao lưu chứa dữ liệu đã mã hóa. Hãy giữ PIN và file ở nơi an toàn.</p>
+    <button id="exportBackupBtn" class="primary">Tải file sao lưu (.pfbackup)</button>
+    <hr>
+    <h3>Xuất dữ liệu thường (không mã hóa)</h3>
+    <p>Xuất bảng giao dịch ra CSV để mở bằng Excel hoặc Google Sheets.</p>
+    <div class="btn-group" style="margin-bottom:10px">
+      <button id="exportCsvBtn" class="primary">Xuất CSV (Excel)</button>
+      <button id="copyTxBtn" class="secondary">Sao chép bảng giao dịch</button>
+    </div>
+    <hr>
+    <label>Chọn file .pfbackup<input id="backupFile" type="file" accept=".pfbackup,.json"></label>
+    <button id="importBackupBtn" class="secondary">Kiểm tra và khôi phục</button>
+  </div>
+</section>
+
+<!-- CÀI ĐẶT -->
+<section id="settingsView" class="view hidden">
+  <div class="panel backup-panel">
+    <h2>Cài đặt</h2>
+    <hr>
+    <h3>Đăng nhập Google &amp; sao lưu Drive</h3>
+    <p style="font-size:12px;color:#5b6967;margin:0 0 10px">
+      Để dùng tính năng này bạn cần tạo <b>OAuth Client ID</b> riêng trên Google Cloud Console (miễn phí).
+      Xem hướng dẫn bên dưới.
+    </p>
+    <label>Google OAuth Client ID
+      <input id="googleClientId" placeholder="xxxxx.apps.googleusercontent.com" autocomplete="off">
+    </label>
+    <div class="btn-group" style="margin:10px 0">
+      <button type="button" id="saveClientIdBtn" class="secondary">Lưu Client ID</button>
+      <button type="button" id="googleLoginBtn" class="primary">Đăng nhập Google</button>
+      <button type="button" id="googleLogoutBtn" class="secondary hidden">Đăng xuất</button>
+    </div>
+    <p id="googleStatus" style="font-size:12px;color:#075e58;margin:6px 0">Chưa đăng nhập</p>
+    <div class="btn-group" style="margin:10px 0">
+      <button type="button" id="driveBackupBtn" class="primary" disabled>Sao lưu lên Google Drive</button>
+      <button type="button" id="driveRestoreBtn" class="secondary" disabled>Khôi phục từ Drive</button>
+    </div>
+    <details style="font-size:12px;margin-top:12px">
+      <summary style="cursor:pointer;font-weight:700">Hướng dẫn tạo Google Client ID (bắt buộc)</summary>
+      <ol style="padding-left:18px;margin:8px 0;line-height:1.5">
+        <li>Vào <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a></li>
+        <li>Tạo project mới (hoặc chọn project có sẵn)</li>
+        <li>Vào <b>APIs &amp; Services → Library</b>, tìm và bật <b>Google Drive API</b></li>
+        <li>Vào <b>APIs &amp; Services → Credentials → Create Credentials → OAuth client ID</b></li>
+        <li>Application type: <b>Web application</b></li>
+        <li>Authorized JavaScript origins: thêm đúng URL app của bạn (ví dụ <code>https://username.github.io</code> hoặc <code>http://localhost:5500</code>)</li>
+        <li>Authorized redirect URIs: có thể để trống hoặc thêm cùng URL</li>
+        <li>Copy Client ID (dạng xxxxx.apps.googleusercontent.com) dán vào ô phía trên rồi bấm <b>Lưu Client ID</b></li>
+        <li>Lần đầu đăng nhập sẽ hỏi quyền truy cập Drive (chỉ file do app tạo)</li>
+      </ol>
+      <p style="color:#b45309">Lưu ý: Client ID là của bạn, không chia sẻ công khai. App chỉ dùng scope <code>drive.file</code> (an toàn hơn).</p>
+    </details>
+    <hr>
+    <h3>Sao lưu cục bộ</h3>
+    <button id="exportBackupBtn2" class="primary">Tải file sao lưu (.pfbackup)</button>
+    <hr>
+    <h3>Thông tin</h3>
+    <p style="font-size:12px;margin:0">Phiên bản: 4.2 · Dữ liệu lưu cục bộ, mã hóa AES-GCM · Sao lưu Drive tùy chọn.</p>
+  </div>
+</section>
+
+<p class="privacy-note">● Dữ liệu lưu cục bộ và được mã hóa. Không gửi dữ liệu tài chính lên máy chủ.</p>
+</section>
+<section id="message" class="message hidden" role="status"></section>
+</main>
+<footer>Phiên bản thử nghiệm · Hãy sao lưu định kỳ</footer>
+<script src="./app.js"></script>
+</body></html>
