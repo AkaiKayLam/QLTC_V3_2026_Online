@@ -1,11 +1,19 @@
 <!doctype html>
 <html lang="vi">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0f766e"><meta name="description" content="Quản lý tài chính cá nhân offline">
-<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon-192.png"><link rel="stylesheet" href="./styles.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#087b72">
+<meta name="description" content="Quản lý tài chính cá nhân offline">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tài chính">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-180.png">
+<link rel="stylesheet" href="./styles.css">
 <script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://apis.google.com/js/api.js" async defer></script>
 <title>Tài chính cá nhân</title>
 </head><body>
 <header class="topbar"><div><small>LOCAL-FIRST · OFFLINE</small><h1>Tài chính cá nhân</h1></div><button id="lockBtn" class="secondary hidden">Khóa</button></header>
@@ -14,7 +22,7 @@
 <form id="setupForm"><label>PIN chính<div class="input-wrap"><input id="setupPassword" type="password" inputmode="numeric" pattern="[0-9]{4,}" minlength="4" autocomplete="new-password" required placeholder="Ít nhất 4 chữ số"><button type="button" class="peek" data-target="setupPassword">Hiện</button><button type="button" class="clear" data-target="setupPassword">×</button></div></label>
 <label>Nhập lại PIN<div class="input-wrap"><input id="setupPassword2" type="password" inputmode="numeric" pattern="[0-9]{4,}" minlength="4" required><button type="button" class="peek" data-target="setupPassword2">Hiện</button><button type="button" class="clear" data-target="setupPassword2">×</button></div></label><button class="primary">Tạo kho dữ liệu</button></form></section>
 <section id="unlockPanel" class="panel narrow hidden"><h2>Mở khóa</h2><form id="unlockForm"><label>PIN<div class="input-wrap"><input id="unlockPassword" type="password" inputmode="numeric" autocomplete="current-password" required><button type="button" class="peek" data-target="unlockPassword">Hiện</button><button type="button" class="clear" data-target="unlockPassword">×</button></div></label><button class="primary">Mở khóa</button></form>
-<button type="button" id="bioUnlockBtn" class="secondary hidden">Mở bằng vân tay / Face ID</button>
+<button type="button" id="bioUnlockBtn" class="primary hidden" style="width:100%;margin-top:10px">🔐 Mở bằng vân tay / Face ID</button>
 <p id="unlockError" class="error"></p></section>
 <section id="appPanel" class="hidden">
 <div class="summary-grid">

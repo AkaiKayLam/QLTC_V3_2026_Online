@@ -115,3 +115,36 @@ footer{text-align:center;color:#7b8785;padding:10px;font-size:11px}
 
 /* Bio button on unlock */
 #bioUnlockBtn{width:100%;margin-top:10px}
+
+/* Android / PWA smoothness */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+body {
+  -webkit-font-smoothing: antialiased;
+  touch-action: manipulation;
+}
+.list, .tabs, main {
+  -webkit-overflow-scrolling: touch;
+}
+.list-row, .tab, .primary, .secondary, .tiny {
+  touch-action: manipulation;
+}
+.list-row {
+  contain: layout style;
+}
+#transactionList {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 800px;
+}
+.topbar {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+footer {
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+/* Prevent laggy 300ms click delay remnants */
+button, .tab, input, select {
+  touch-action: manipulation;
+}

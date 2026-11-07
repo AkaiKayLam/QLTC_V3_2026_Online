@@ -130,6 +130,12 @@ function getDebtAccount(){
 }
 
 function render(){
+  // coalesce multiple render calls into one frame (mượt hơn trên Android)
+  if(window.__renderScheduled) return;
+  window.__renderScheduled = true;
+  requestAnimationFrame(()=>{ window.__renderScheduled=false; renderNow(); });
+}
+function renderNow(){
   let inc=txTotal("INCOME"), out=txTotal("EXPENSE");
   let opening=appData.accounts.reduce((s,a)=>s+(a.openingBalance||0),0);
   $("incomeTotal").textContent=money(inc);
@@ -170,49 +176,47 @@ function filteredTransactions(){
 }
 
 function renderTransactions(){
-  let rows=filteredTransactions();
-  let show=rows.slice(0,txDisplayLimit);
-  let html="";
+  const list = $("transactionList");
+  if(!list) return;
+  const rows = filteredTransactions();
+  const show = rows.slice(0, txDisplayLimit);
   if(!show.length){
-    html='<div class="empty">Chưa có giao dịch'+(txFilter.kw||txFilter.from||txFilter.to?' khớp tìm kiếm':'')+'.</div>';
+    list.innerHTML = '<div class="empty">Chưa có giao dịch'+(txFilter.kw||txFilter.from||txFilter.to?' khớp tìm kiếm':'')+'.</div>';
   }else{
-    let lastDay="";
-    html=show.map(t=>{
-      let dayBlock="";
-      if(t.date!==lastDay){
-        lastDay=t.date;
-        dayBlock=`<div class="day-sep">${esc(t.date)}</div>`;
+    const accMap = {};
+    for(const a of appData.accounts) accMap[a.id] = a.name;
+    let lastDay = "";
+    let html = "";
+    for(let i=0;i<show.length;i++){
+      const t = show[i];
+      if(t.date !== lastDay){
+        lastDay = t.date;
+        html += '<div class="day-sep">'+esc(t.date)+'</div>';
       }
-      let a=appData.accounts.find(x=>x.id===t.accountId);
-      if(t.type==="TRANSFER"){
-        let toA=appData.accounts.find(x=>x.id===t.toAccountId);
-        return dayBlock+`<div class="list-row">
-          <div class="grow"><b>Chuyển khoản <span class="transfer-tag">Chuyển</span></b>
-          <small>${esc(a?.name||"?")} → ${esc(toA?.name||"?")}${t.note?" · "+esc(t.note):""}</small></div>
-          <strong class="amount">${money(t.amount)}</strong>
-          <div class="actions"><button data-del-tx="${t.id}" class="tiny danger">Xóa</button></div>
-        </div>`;
+      if(t.type === "TRANSFER"){
+        html += '<div class="list-row"><div class="grow"><b>Chuyển khoản <span class="transfer-tag">Chuyển</span></b><small>'
+          +esc(accMap[t.accountId]||"?")+' → '+esc(accMap[t.toAccountId]||"?")
+          +(t.note?(' · '+esc(t.note)):'')+'</small></div><strong class="amount">'+money(t.amount)
+          +'</strong><div class="actions"><button data-del-tx="'+t.id+'" class="tiny danger">Xóa</button></div></div>';
+      }else{
+        const tag = t.debtId ? (' <span class="debt-tag '+(t.type==="INCOME"?"lend":"borrow")+'">Vay nợ</span>') : "";
+        html += '<div class="list-row"><div class="grow"><b>'+esc(t.category)+tag+'</b><small>'
+          +esc(accMap[t.accountId]||"Tài khoản đã xóa")+(t.note?(' · '+esc(t.note)):'')
+          +'</small></div><strong class="amount '+(t.type==="INCOME"?"income":"expense")+'">'
+          +(t.type==="INCOME"?"+":"−")+money(t.amount)
+          +'</strong><div class="actions"><button data-edit-tx="'+t.id+'" class="tiny">Sửa</button>'
+          +'<button data-del-tx="'+t.id+'" class="tiny danger">Xóa</button></div></div>';
       }
-      let tag="";
-      if(t.debtId) tag=` <span class="debt-tag ${t.type==="INCOME"?"lend":"borrow"}">Vay nợ</span>`;
-      return dayBlock+`<div class="list-row">
-        <div class="grow"><b>${esc(t.category)}${tag}</b>
-        <small>${esc(a?.name||"Tài khoản đã xóa")}${t.note?" · "+esc(t.note):""}</small></div>
-        <strong class="amount ${t.type==="INCOME"?"income":"expense"}">${t.type==="INCOME"?"+":"−"}${money(t.amount)}</strong>
-        <div class="actions">
-          <button data-edit-tx="${t.id}" class="tiny">Sửa</button>
-          <button data-del-tx="${t.id}" class="tiny danger">Xóa</button>
-        </div>
-      </div>`;
-    }).join("");
+    }
+    list.innerHTML = html;
   }
-  $("transactionList").innerHTML=html;
-  let remain=rows.length - show.length;
-  if(remain>0){
-    $("loadMoreWrap").classList.remove("hidden");
-    $("loadMoreBtn").textContent=`Hiển thị thêm (còn ${remain})`;
-  }else{
-    $("loadMoreWrap").classList.add("hidden");
+  const remain = rows.length - show.length;
+  const wrap = $("loadMoreWrap");
+  if(wrap){
+    if(remain > 0){
+      wrap.classList.remove("hidden");
+      $("loadMoreBtn").textContent = "Hiển thị thêm (còn "+remain+")";
+    }else wrap.classList.add("hidden");
   }
 }
 
@@ -623,7 +627,7 @@ $("addAccountBtn").onclick=()=>{
   $("accountForm").classList.remove("hidden");
 };
 $("cancelAccountBtn").onclick=()=>$("accountForm").classList.add("hidden");
-$("accountSearch").oninput=renderAccounts;
+let _accSearchTimer; $("accountSearch").oninput=()=>{clearTimeout(_accSearchTimer);_accSearchTimer=setTimeout(renderAccounts,120)};
 $("accountForm").onsubmit=async e=>{
   e.preventDefault();
   let id=$("accountId").value, name=$("accountName").value.trim();
@@ -1147,102 +1151,175 @@ async function driveRestoreBackup(){
   }
 }
 
-/* ========== BIOMETRIC (WebAuthn) ========== */
+
+/* ========== BIOMETRIC (WebAuthn) – tối ưu Android ========== */
 const BIO_CRED_KEY = "pf_webauthn_cred";
-const BIO_PIN_KEY = "pf_bio_pin"; // stored only after explicit bio registration on this device
+const BIO_PIN_KEY = "pf_bio_pin";
 
 function bioSupported(){
-  return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
+  try{
+    return !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext);
+  }catch(e){ return false; }
+}
+
+async function bioPlatformAvailable(){
+  if(!bioSupported()) return false;
+  try{
+    if(typeof PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable === "function"){
+      return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+    }
+  }catch(e){}
+  return true; // assume possible
+}
+
+function getRpId(){
+  // Android Chrome requires exact host; never use empty
+  const h = location.hostname;
+  if(!h || h === "localhost" || h === "127.0.0.1") return "localhost";
+  return h;
 }
 
 function updateBioUI(){
   const has = !!localStorage.getItem(BIO_CRED_KEY) && !!localStorage.getItem(BIO_PIN_KEY);
-  if($("bioStatus")) $("bioStatus").textContent = has
-    ? "Đã đăng ký vân tay / Face ID. Có thể mở khóa không cần gõ PIN."
-    : "Chưa đăng ký sinh trắc học.";
-  if($("bioUnlockBtn")) $("bioUnlockBtn").classList.toggle("hidden", !has || !bioSupported());
-  if($("bioRegisterBtn")) $("bioRegisterBtn").disabled = !bioSupported() || !cryptoKey;
+  const secure = !!window.isSecureContext;
+  if($("bioStatus")){
+    if(!secure){
+      $("bioStatus").textContent = "Cần HTTPS hoặc localhost mới dùng vân tay được.";
+    }else if(!bioSupported()){
+      $("bioStatus").textContent = "Trình duyệt không hỗ trợ WebAuthn.";
+    }else if(has){
+      $("bioStatus").textContent = "Đã đăng ký vân tay / Face ID — mở khóa không cần gõ PIN.";
+    }else{
+      $("bioStatus").textContent = "Chưa đăng ký. Mở khóa bằng PIN trước, rồi bấm Đăng ký.";
+    }
+  }
+  if($("bioUnlockBtn")) $("bioUnlockBtn").classList.toggle("hidden", !has || !secure);
+  if($("bioRegisterBtn")) $("bioRegisterBtn").disabled = !secure || !bioSupported() || !cryptoKey;
   if($("bioRemoveBtn")) $("bioRemoveBtn").disabled = !has;
 }
 
 async function bioRegister(){
-  if(!bioSupported()){ msg("Thiết bị hoặc trình duyệt không hỗ trợ vân tay / Face ID."); return; }
-  if(!cryptoKey){ msg("Hãy mở khóa app bằng PIN trước khi đăng ký."); return; }
-  let pin = prompt("Nhập lại PIN hiện tại để liên kết với vân tay / Face ID:");
-  if(!pin) return;
-  // Verify PIN by trying derive + decrypt vault
-  try{
-    let v = await readVault();
-    if(!v) throw new Error("Không có dữ liệu");
-    let k = await derive(pin, un64(v.salt));
-    await dec(v, k); // will throw if wrong
-  }catch(e){
-    msg("PIN không đúng. Không thể đăng ký sinh trắc học.");
+  if(!window.isSecureContext){
+    msg("Vân tay chỉ hoạt động trên HTTPS hoặc localhost. Hãy cài app từ GitHub Pages / Add to Home screen.");
     return;
   }
+  if(!bioSupported()){ msg("Trình duyệt không hỗ trợ vân tay / Face ID."); return; }
+  if(!cryptoKey){ msg("Hãy mở khóa bằng PIN trước khi đăng ký vân tay."); return; }
+
+  const available = await bioPlatformAvailable();
+  if(!available){
+    msg("Thiết bị không có vân tay/Face ID dùng được với trình duyệt này.");
+    return;
+  }
+
+  let pin = prompt("Nhập lại PIN hiện tại để liên kết vân tay / Face ID:");
+  if(!pin) return;
   try{
+    let v = await readVault();
+    if(!v) throw new Error("no vault");
+    let k = await derive(pin, un64(v.salt));
+    await dec(v, k);
+  }catch(e){
+    msg("PIN không đúng.");
+    return;
+  }
+
+  try{
+    // Remove old credential first
+    localStorage.removeItem(BIO_CRED_KEY);
+    localStorage.removeItem(BIO_PIN_KEY);
+
     const userId = crypto.getRandomValues(new Uint8Array(16));
     const challenge = crypto.getRandomValues(new Uint8Array(32));
-    const cred = await navigator.credentials.create({
-      publicKey: {
-        challenge,
-        rp: { name: "Tài chính cá nhân", id: location.hostname || "localhost" },
-        user: { id: userId, name: "local-user", displayName: "Người dùng local" },
-        pubKeyCredParams: [
-          { type: "public-key", alg: -7 },
-          { type: "public-key", alg: -257 }
-        ],
-        authenticatorSelection: {
-          authenticatorAttachment: "platform",
-          userVerification: "required",
-          residentKey: "preferred"
-        },
-        timeout: 60000,
-        attestation: "none"
-      }
-    });
-    if(!cred) throw new Error("Không tạo được credential");
-    const rawId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+    const rpId = getRpId();
+
+    const publicKey = {
+      challenge,
+      rp: { name: "Tai chinh ca nhan", id: rpId },
+      user: {
+        id: userId,
+        name: "user@" + rpId,
+        displayName: "Tai chinh"
+      },
+      pubKeyCredParams: [
+        { type: "public-key", alg: -7 },   // ES256
+        { type: "public-key", alg: -257 }  // RS256
+      ],
+      authenticatorSelection: {
+        authenticatorAttachment: "platform",
+        userVerification: "required",
+        residentKey: "preferred",
+        requireResidentKey: false
+      },
+      timeout: 90000,
+      attestation: "none"
+    };
+
+    const cred = await navigator.credentials.create({ publicKey });
+    if(!cred || !cred.rawId) throw new Error("Không nhận được credential từ thiết bị");
+
+    const rawId = btoa(String.fromCharCode.apply(null, Array.from(new Uint8Array(cred.rawId))));
     localStorage.setItem(BIO_CRED_KEY, rawId);
-    // Store PIN for this device only; gated by successful biometric assertion
     localStorage.setItem(BIO_PIN_KEY, btoa(unescape(encodeURIComponent(pin))));
+    // Also remember rpId used
+    localStorage.setItem("pf_bio_rpid", rpId);
+
     updateBioUI();
-    msg("Đã đăng ký vân tay / Face ID. Lần sau mở app chỉ cần sinh trắc học.");
+    msg("Đăng ký vân tay / Face ID thành công. Lần sau chỉ cần chạm vân tay.");
   }catch(e){
-    console.error(e);
-    msg("Đăng ký sinh trắc học thất bại: " + (e.message || e.name || e));
+    console.error("bioRegister", e);
+    let m = e.message || e.name || String(e);
+    if(e.name === "NotAllowedError") m = "Bạn đã hủy hoặc thiết bị từ chối. Thử lại và xác nhận vân tay khi hệ thống hỏi.";
+    if(e.name === "InvalidStateError") m = "Vân tay đã đăng ký trước đó. Bấm Hủy đăng ký rồi đăng ký lại.";
+    if(e.name === "SecurityError") m = "Lỗi bảo mật (rpId/origin). App phải chạy đúng domain HTTPS đã cài.";
+    msg("Đăng ký thất bại: " + m);
   }
 }
 
 async function bioUnlock(){
-  if(!bioSupported()){ msg("Thiết bị không hỗ trợ."); return; }
+  if(!window.isSecureContext){
+    $("unlockError").textContent = "Cần HTTPS hoặc localhost.";
+    return;
+  }
   const stored = localStorage.getItem(BIO_CRED_KEY);
   const encPin = localStorage.getItem(BIO_PIN_KEY);
-  if(!stored || !encPin){ msg("Chưa đăng ký sinh trắc học."); return; }
+  if(!stored || !encPin){
+    $("unlockError").textContent = "Chưa đăng ký vân tay trên thiết bị này.";
+    return;
+  }
   try{
-    $("unlockError").textContent = "";
+    $("unlockError").textContent = "Đang chờ vân tay / Face ID...";
     const challenge = crypto.getRandomValues(new Uint8Array(32));
     const rawId = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
+    const rpId = localStorage.getItem("pf_bio_rpid") || getRpId();
+
     const assertion = await navigator.credentials.get({
       publicKey: {
         challenge,
-        allowCredentials: [{ type: "public-key", id: rawId, transports: ["internal"] }],
+        rpId,
+        allowCredentials: [{
+          type: "public-key",
+          id: rawId,
+          transports: ["internal"]
+        }],
         userVerification: "required",
-        timeout: 60000
+        timeout: 90000
       }
     });
     if(!assertion) throw new Error("Xác thực thất bại");
-    // Biometric OK → unlock with stored PIN automatically
+
     const pin = decodeURIComponent(escape(atob(encPin)));
+    $("unlockError").textContent = "";
     await unlock(pin);
     msg("Đã mở khóa bằng vân tay / Face ID.");
   }catch(e){
-    console.error(e);
-    if(e.name === "NotAllowedError") {
-      $("unlockError").textContent = "Đã hủy hoặc sinh trắc học không khớp.";
-    } else {
-      $("unlockError").textContent = "Mở khóa sinh trắc học thất bại.";
-      msg("Mở khóa thất bại: " + (e.message || e.name));
+    console.error("bioUnlock", e);
+    if(e.name === "NotAllowedError"){
+      $("unlockError").textContent = "Đã hủy hoặc vân tay không khớp. Thử lại.";
+    }else if(e.name === "SecurityError"){
+      $("unlockError").textContent = "Lỗi domain/HTTPS. Mở đúng địa chỉ đã đăng ký.";
+    }else{
+      $("unlockError").textContent = "Không mở được: " + (e.message || e.name);
     }
   }
 }
@@ -1250,8 +1327,9 @@ async function bioUnlock(){
 function bioRemove(){
   localStorage.removeItem(BIO_CRED_KEY);
   localStorage.removeItem(BIO_PIN_KEY);
+  localStorage.removeItem("pf_bio_rpid");
   updateBioUI();
-  msg("Đã hủy đăng ký sinh trắc học trên thiết bị này.");
+  msg("Đã hủy đăng ký vân tay / Face ID.");
 }
 
 function wireGoogleButtons(){
@@ -1287,6 +1365,10 @@ async function init(){
   const hasVault = !!(await readVault());
   showOnly(hasVault?"unlockPanel":"setupPanel");
   updateBioUI();
+  // Android: nếu đã đăng ký vân tay thì tự gợi ý sau 400ms
+  if(hasVault && localStorage.getItem("pf_webauthn_cred") && window.isSecureContext){
+    setTimeout(()=>{ if($("bioUnlockBtn") && !$("bioUnlockBtn").classList.contains("hidden")) { /* chỉ hiện nút, không auto-trigger (tránh bị chặn) */ } }, 300);
+  }
   if("serviceWorker" in navigator && (location.protocol==="https:"||location.hostname==="localhost"))
     navigator.serviceWorker.register("./sw.js").catch(()=>{});
   wireGoogleButtons();
