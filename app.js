@@ -243,13 +243,11 @@ function renderCategories(){
     "Chi khác":["Sự kiện","Biếu tặng","Dịch vụ công","Chi khác","Cho vay","Trả nợ"]
   };
   let out=[];
-  // income first
   out.push(`<div class="cat-group">Thu nhập</div>`);
   for(let name of appData.categories.INCOME){
-    out.push(`<div class="list-row"><div class="grow"><b>${esc(name)}</b><small>Thu nhập</small></div>
+    out.push(`<div class="list-row cat-child"><div class="grow"><b>${esc(name)}</b></div>
       <button class="tiny danger" data-del-category="INCOME|${encodeURIComponent(name)}">Xóa</button></div>`);
   }
-  // expense groups
   let used=new Set();
   for(let [gname,list] of Object.entries(groups)){
     if(gname==="Thu nhập") continue;
@@ -258,16 +256,15 @@ function renderCategories(){
     out.push(`<div class="cat-group">${esc(gname)}</div>`);
     for(let name of items){
       used.add(name);
-      out.push(`<div class="list-row"><div class="grow"><b>${esc(name)}</b><small>Chi tiêu</small></div>
+      out.push(`<div class="list-row cat-child"><div class="grow"><b>${esc(name)}</b></div>
         <button class="tiny danger" data-del-category="EXPENSE|${encodeURIComponent(name)}">Xóa</button></div>`);
     }
   }
-  // remaining expense
   let rest=appData.categories.EXPENSE.filter(n=>!used.has(n));
   if(rest.length){
     out.push(`<div class="cat-group">Khác</div>`);
     for(let name of rest){
-      out.push(`<div class="list-row"><div class="grow"><b>${esc(name)}</b><small>Chi tiêu</small></div>
+      out.push(`<div class="list-row cat-child"><div class="grow"><b>${esc(name)}</b></div>
         <button class="tiny danger" data-del-category="EXPENSE|${encodeURIComponent(name)}">Xóa</button></div>`);
     }
   }
@@ -367,7 +364,7 @@ function renderDebts(){
 
 function switchTab(t){
   document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));
-  ["accounts","transactions","debts","stats","budgets","categories","backup","settings"].forEach(v=>{
+  ["accounts","transactions","debts","stats","budgets","categories","backup"].forEach(v=>{
     let el=$(`${v}View`);
     if(el) el.classList.toggle("hidden",v!==t);
   });
@@ -894,7 +891,7 @@ $("statsRunBtn").onclick=runStats;
 
 /* Backup */
 $("exportBackupBtn").onclick=()=>exportBackup().catch(e=>msg(e.message));
-$("exportBackupBtn2").onclick=()=>exportBackup().catch(e=>msg(e.message));
+
 $("importBackupBtn").onclick=()=>importBackup($("backupFile").files[0]).catch(e=>msg("Khôi phục thất bại: "+e.message));
 $("exportCsvBtn").onclick=()=>exportCsv();
 $("copyTxBtn").onclick=()=>copyTransactionsTable();
@@ -995,10 +992,30 @@ function googleLogout(){
   msg("Đã đăng xuất Google.");
 }
 
+
+async function driveFindLatestBackupId(){
+  const fixedName = "TaiChinhCaNhan_latest.pfbackup";
+  let q = "name = '" + fixedName + "' and trashed=false";
+  let res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=5&fields=files(id,name)&q=" + encodeURIComponent(q), {
+    headers: { "Authorization": "Bearer " + googleAccessToken }
+  });
+  if(res.ok){
+    const data = await res.json();
+    if(data.files && data.files.length) return data.files[0].id;
+  }
+  q = "name contains 'TaiChinhCaNhan_' and name contains '.pfbackup' and trashed=false";
+  res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=5&fields=files(id,name,createdTime)&q=" + encodeURIComponent(q) + "&orderBy=createdTime desc", {
+    headers: { "Authorization": "Bearer " + googleAccessToken }
+  });
+  if(!res.ok) return null;
+  const data = await res.json();
+  return (data.files && data.files[0]) ? data.files[0].id : null;
+}
+
 async function driveUploadBackup(){
   if(!googleAccessToken){ msg("Hãy đăng nhập Google trước."); return; }
   try{
-    msg("Đang tạo và tải lên Drive...");
+    msg("Đang sao lưu lên Drive (ghi đè)...");
     const v = await readVault();
     const payload = {
       format: BACKUP_FORMAT,
@@ -1007,38 +1024,37 @@ async function driveUploadBackup(){
       vault: v
     };
     const content = JSON.stringify(payload);
-    const metadata = {
-      name: `TaiChinhCaNhan_${today()}.pfbackup`,
-      mimeType: "application/json",
-      parents: [] // root
-    };
-    // Use multipart upload
-    const boundary = "-------pfbackupboundary";
-    const delimiter = "\\r\\n--" + boundary + "\\r\\n";
-    const closeDelim = "\\r\\n--" + boundary + "--";
-    const body =
-      delimiter +
-      "Content-Type: application/json; charset=UTF-8\\r\\n\\r\\n" +
-      JSON.stringify(metadata) +
-      delimiter +
-      "Content-Type: application/json\\r\\n\\r\\n" +
-      content +
-      closeDelim;
+    const fixedName = "TaiChinhCaNhan_latest.pfbackup";
+    const existingId = await driveFindLatestBackupId();
 
-    const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name", {
-      method: "POST",
-      headers: {
-        "Authorization": "Bearer " + googleAccessToken,
-        "Content-Type": "multipart/related; boundary=" + boundary
-      },
-      body: body
-    });
-    if(!res.ok){
-      const err = await res.text();
-      throw new Error(err || res.statusText);
+    if(existingId){
+      const res = await fetch("https://www.googleapis.com/upload/drive/v3/files/" + existingId + "?uploadType=media", {
+        method: "PATCH",
+        headers: {
+          "Authorization": "Bearer " + googleAccessToken,
+          "Content-Type": "application/json"
+        },
+        body: content
+      });
+      if(!res.ok) throw new Error(await res.text());
+      msg("Đã ghi đè bản sao lưu trên Google Drive.");
+    }else{
+      const metadata = { name: fixedName, mimeType: "application/json" };
+      const boundary = "-------pfbackupboundary";
+      const delimiter = "\r\n--" + boundary + "\r\n";
+      const closeDelim = "\r\n--" + boundary + "--";
+      const body = delimiter + "Content-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(metadata) + delimiter + "Content-Type: application/json\r\n\r\n" + content + closeDelim;
+      const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + googleAccessToken,
+          "Content-Type": "multipart/related; boundary=" + boundary
+        },
+        body: body
+      });
+      if(!res.ok) throw new Error(await res.text());
+      msg("Đã tạo bản sao lưu trên Google Drive.");
     }
-    const data = await res.json();
-    msg("Đã sao lưu lên Google Drive: " + (data.name || "thành công"));
   }catch(e){
     console.error(e);
     msg("Sao lưu Drive thất bại: " + (e.message || e));
@@ -1046,13 +1062,26 @@ async function driveUploadBackup(){
 }
 
 async function driveListBackups(){
-  const q = "name contains 'TaiChinhCaNhan_' and name contains '.pfbackup' and trashed=false";
-  const res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=20&fields=files(id,name,createdTime)&q=" + encodeURIComponent(q) + "&orderBy=createdTime desc", {
+  // Prefer the fixed latest file first
+  let files = [];
+  let q = "name = 'TaiChinhCaNhan_latest.pfbackup' and trashed=false";
+  let res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=5&fields=files(id,name,createdTime)&q=" + encodeURIComponent(q), {
     headers: { "Authorization": "Bearer " + googleAccessToken }
   });
-  if(!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.files || [];
+  if(res.ok){
+    const data = await res.json();
+    if(data.files) files = files.concat(data.files);
+  }
+  q = "name contains 'TaiChinhCaNhan_' and name contains '.pfbackup' and trashed=false";
+  res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=15&fields=files(id,name,createdTime)&q=" + encodeURIComponent(q) + "&orderBy=createdTime desc", {
+    headers: { "Authorization": "Bearer " + googleAccessToken }
+  });
+  if(res.ok){
+    const data = await res.json();
+    const ids = new Set(files.map(f=>f.id));
+    for(const f of (data.files||[])) if(!ids.has(f.id)) files.push(f);
+  }
+  return files;
 }
 
 async function driveRestoreBackup(){
@@ -1098,6 +1127,103 @@ async function driveRestoreBackup(){
 }
 
 // Wire Google buttons (call after DOM ready, in init or here)
+
+/* ========== BIOMETRIC (WebAuthn) ========== */
+const BIO_CRED_KEY = "pf_webauthn_cred";
+
+function bioSupported(){
+  return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
+}
+
+function updateBioUI(){
+  const has = !!localStorage.getItem(BIO_CRED_KEY);
+  if($("bioStatus")) $("bioStatus").textContent = has ? "Đã đăng ký vân tay / Face ID trên thiết bị này." : "Chưa đăng ký sinh trắc học.";
+  if($("bioUnlockBtn")) $("bioUnlockBtn").classList.toggle("hidden", !has || !bioSupported());
+  if($("bioRegisterBtn")) $("bioRegisterBtn").disabled = !bioSupported();
+}
+
+async function bioRegister(){
+  if(!bioSupported()){ msg("Thiết bị hoặc trình duyệt không hỗ trợ vân tay / Face ID."); return; }
+  if(!cryptoKey){ msg("Hãy mở khóa app bằng PIN trước khi đăng ký sinh trắc học."); return; }
+  try{
+    // Create a random user id and challenge
+    const userId = crypto.getRandomValues(new Uint8Array(16));
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge,
+        rp: { name: "Tài chính cá nhân", id: location.hostname },
+        user: {
+          id: userId,
+          name: "local-user",
+          displayName: "Người dùng local"
+        },
+        pubKeyCredParams: [
+          { type: "public-key", alg: -7 },
+          { type: "public-key", alg: -257 }
+        ],
+        authenticatorSelection: {
+          authenticatorAttachment: "platform",
+          userVerification: "required",
+          residentKey: "preferred"
+        },
+        timeout: 60000,
+        attestation: "none"
+      }
+    });
+    if(!cred) throw new Error("Không tạo được credential");
+    // Store credential id (base64)
+    const rawId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
+    localStorage.setItem(BIO_CRED_KEY, rawId);
+    // We still rely on PIN-derived key stored only in memory; biometric just gates unlock UI.
+    // For stronger binding one would wrap the cryptoKey, but that requires more complex key storage.
+    updateBioUI();
+    msg("Đã đăng ký vân tay / Face ID. Lần sau có thể dùng để mở khóa.");
+  }catch(e){
+    console.error(e);
+    msg("Đăng ký sinh trắc học thất bại: " + (e.message || e.name || e));
+  }
+}
+
+async function bioUnlock(){
+  if(!bioSupported()){ msg("Thiết bị không hỗ trợ."); return; }
+  const stored = localStorage.getItem(BIO_CRED_KEY);
+  if(!stored){ msg("Chưa đăng ký sinh trắc học."); return; }
+  try{
+    const challenge = crypto.getRandomValues(new Uint8Array(32));
+    const rawId = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
+    const assertion = await navigator.credentials.get({
+      publicKey: {
+        challenge,
+        allowCredentials: [{ type: "public-key", id: rawId, transports: ["internal"] }],
+        userVerification: "required",
+        timeout: 60000
+      }
+    });
+    if(!assertion) throw new Error("Xác thực thất bại");
+    // Biometric passed. We still need the PIN because the encryption key is derived from PIN.
+    // Ask for PIN after successful bio (or store a wrapped key - simplified here: prompt PIN once after bio).
+    // Better UX: after bio success, if we have a session hint, but for security we prompt PIN.
+    // Alternative simple approach used by many apps: bio just confirms presence, then use last PIN? No.
+    // Practical approach: after successful bio, show PIN field focused, or auto-try if user stored PIN (not recommended).
+    // Here: after bio OK, prompt for PIN once.
+    let pin = prompt("Xác thực sinh trắc học thành công. Nhập PIN để mở dữ liệu:");
+    if(!pin) return;
+    await unlock(pin);
+    msg("Đã mở khóa bằng sinh trắc học + PIN.");
+  }catch(e){
+    console.error(e);
+    if(e.name === "NotAllowedError") msg("Bạn đã hủy hoặc sinh trắc học không khớp.");
+    else msg("Mở khóa sinh trắc học thất bại: " + (e.message || e.name));
+  }
+}
+
+function bioRemove(){
+  localStorage.removeItem(BIO_CRED_KEY);
+  updateBioUI();
+  msg("Đã hủy đăng ký sinh trắc học trên thiết bị này.");
+}
+
 function wireGoogleButtons(){
   if($("saveClientIdBtn")){
     $("saveClientIdBtn").onclick = ()=>{
@@ -1115,6 +1241,11 @@ function wireGoogleButtons(){
   if($("googleLogoutBtn")) $("googleLogoutBtn").onclick = googleLogout;
   if($("driveBackupBtn")) $("driveBackupBtn").onclick = ()=>driveUploadBackup();
   if($("driveRestoreBtn")) $("driveRestoreBtn").onclick = ()=>driveRestoreBackup();
+  // Biometric
+  if($("bioRegisterBtn")) $("bioRegisterBtn").onclick = bioRegister;
+  if($("bioRemoveBtn")) $("bioRemoveBtn").onclick = bioRemove;
+  if($("bioUnlockBtn")) $("bioUnlockBtn").onclick = bioUnlock;
+  updateBioUI();
 }
 
 async function init(){
@@ -1123,7 +1254,9 @@ async function init(){
     return;
   }
   db=await openDb();
-  showOnly(await readVault()?"unlockPanel":"setupPanel");
+  const hasVault = !!(await readVault());
+  showOnly(hasVault?"unlockPanel":"setupPanel");
+  updateBioUI();
   if("serviceWorker" in navigator && (location.protocol==="https:"||location.hostname==="localhost"))
     navigator.serviceWorker.register("./sw.js").catch(()=>{});
   wireGoogleButtons();

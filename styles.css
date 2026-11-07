@@ -97,3 +97,21 @@ footer{text-align:center;color:#7b8785;padding:10px;font-size:11px}
   .debt-summary{grid-template-columns:1fr}
   .chart-bar .label{width:80px}
 }
+
+/* Category hierarchy */
+.cat-group{
+  font-size:14px;
+  color:#111;
+  font-weight:800;
+  margin:14px 0 4px;
+  padding:4px 2px;
+  letter-spacing:0.01em;
+}
+.cat-child{
+  font-size:12px;
+  color:#6b7280;
+}
+.cat-child b{font-weight:600;color:#4b5563}
+
+/* Bio button on unlock */
+#bioUnlockBtn{width:100%;margin-top:10px}
