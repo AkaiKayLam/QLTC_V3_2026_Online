@@ -102,6 +102,7 @@ function lock(){
   $("lockBtn").classList.add("hidden");
   $("unlockPassword").value="";
   showOnly("unlockPanel");
+  updateBioUI();
 }
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 
@@ -898,13 +899,11 @@ $("copyTxBtn").onclick=()=>copyTransactionsTable();
 
 
 
+
 /* ========== GOOGLE DRIVE BACKUP ========== */
 const GOOGLE_SCOPE = "https://www.googleapis.com/auth/drive.file";
-const GOOGLE_DISCOVERY = "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest";
 let googleTokenClient = null;
 let googleAccessToken = null;
-let gapiInited = false;
-let gisInited = false;
 
 function getSavedClientId(){
   return localStorage.getItem("pf_google_client_id") || "";
@@ -921,8 +920,8 @@ function updateGoogleUI(){
   if($("googleLogoutBtn")) $("googleLogoutBtn").classList.toggle("hidden", !logged);
   if($("driveBackupBtn")) $("driveBackupBtn").disabled = !logged;
   if($("driveRestoreBtn")) $("driveRestoreBtn").disabled = !logged;
-  if(logged) setGoogleStatus("Đã đăng nhập Google", true);
-  else setGoogleStatus("Chưa đăng nhập", false);
+  if(logged) setGoogleStatus("Đã đăng nhập Google — có thể sao lưu", true);
+  else setGoogleStatus(getSavedClientId() ? "Đã có Client ID — hãy Đăng nhập Google" : "Chưa cấu hình Client ID", false);
 }
 
 function initGoogleApis(){
@@ -930,68 +929,88 @@ function initGoogleApis(){
   if($("googleClientId")) $("googleClientId").value = clientId;
   if(!clientId){
     setGoogleStatus("Chưa cấu hình Client ID", false);
+    updateGoogleUI();
     return;
   }
-  // Wait for scripts
   const tryInit = ()=>{
-    if(typeof gapi === "undefined" || typeof google === "undefined" || !google.accounts){
-      setTimeout(tryInit, 300);
+    if(typeof google === "undefined" || !google.accounts || !google.accounts.oauth2){
+      setTimeout(tryInit, 400);
       return;
     }
-    gapi.load("client", async ()=>{
-      try{
-        await gapi.client.init({discoveryDocs:[GOOGLE_DISCOVERY]});
-        gapiInited = true;
-      }catch(e){ console.warn(e); }
-    });
-    googleTokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: clientId,
-      scope: GOOGLE_SCOPE,
-      callback: (resp)=>{
-        if(resp.error){
-          setGoogleStatus("Đăng nhập thất bại: "+(resp.error_description||resp.error), false);
-          googleAccessToken = null;
+    try{
+      googleTokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: GOOGLE_SCOPE,
+        callback: (resp)=>{
+          if(resp.error){
+            console.error(resp);
+            setGoogleStatus("Đăng nhập thất bại: " + (resp.error_description || resp.error), false);
+            googleAccessToken = null;
+            updateGoogleUI();
+            msg("Google lỗi: " + (resp.error_description || resp.error) + ". Kiểm tra Client ID và Authorized JavaScript origins.");
+            return;
+          }
+          googleAccessToken = resp.access_token;
           updateGoogleUI();
-          return;
+          msg("Đã đăng nhập Google thành công.");
+        },
+        error_callback: (err)=>{
+          console.error(err);
+          msg("Không mở được cửa sổ đăng nhập Google. Kiểm tra origin (HTTPS/localhost) và Client ID.");
         }
-        googleAccessToken = resp.access_token;
-        gapi.client.setToken({access_token: googleAccessToken});
-        updateGoogleUI();
-        msg("Đã đăng nhập Google thành công.");
-      }
-    });
-    gisInited = true;
-    updateGoogleUI();
+      });
+      updateGoogleUI();
+    }catch(e){
+      console.error(e);
+      setGoogleStatus("Lỗi khởi tạo Google: " + e.message, false);
+    }
   };
   tryInit();
 }
 
 function googleLogin(){
-  const clientId = getSavedClientId() || ($("googleClientId")&&$("googleClientId").value.trim());
-  if(!clientId){
-    msg("Hãy nhập và Lưu Google Client ID trước.");
+  const clientId = ($("googleClientId") && $("googleClientId").value.trim()) || getSavedClientId();
+  if(!clientId || !clientId.includes("apps.googleusercontent.com")){
+    msg("Hãy nhập đúng Google Client ID rồi bấm Lưu Client ID.");
     return;
   }
+  localStorage.setItem("pf_google_client_id", clientId);
   if(!googleTokenClient){
-    // re-init with current id
-    localStorage.setItem("pf_google_client_id", clientId);
     initGoogleApis();
-    setTimeout(googleLogin, 800);
+    setTimeout(()=>{
+      if(googleTokenClient) googleTokenClient.requestAccessToken({prompt: "consent"});
+      else msg("Google script chưa sẵn sàng. Đợi 2 giây rồi thử lại.");
+    }, 600);
     return;
   }
+  // Re-create client if clientId changed
+  googleTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: GOOGLE_SCOPE,
+    callback: (resp)=>{
+      if(resp.error){
+        setGoogleStatus("Đăng nhập thất bại: " + (resp.error_description || resp.error), false);
+        googleAccessToken = null;
+        updateGoogleUI();
+        msg("Google lỗi: " + (resp.error_description || resp.error));
+        return;
+      }
+      googleAccessToken = resp.access_token;
+      updateGoogleUI();
+      msg("Đã đăng nhập Google thành công.");
+    }
+  });
   googleTokenClient.requestAccessToken({prompt: googleAccessToken ? "" : "consent"});
 }
 
 function googleLogout(){
-  if(googleAccessToken && typeof google !== "undefined"){
-    google.accounts.oauth2.revoke(googleAccessToken, ()=>{});
+  if(googleAccessToken && typeof google !== "undefined" && google.accounts){
+    try{ google.accounts.oauth2.revoke(googleAccessToken, ()=>{}); }catch(e){}
   }
   googleAccessToken = null;
-  if(typeof gapi !== "undefined" && gapi.client) gapi.client.setToken(null);
   updateGoogleUI();
   msg("Đã đăng xuất Google.");
 }
-
 
 async function driveFindLatestBackupId(){
   const fixedName = "TaiChinhCaNhan_latest.pfbackup";
@@ -1003,13 +1022,7 @@ async function driveFindLatestBackupId(){
     const data = await res.json();
     if(data.files && data.files.length) return data.files[0].id;
   }
-  q = "name contains 'TaiChinhCaNhan_' and name contains '.pfbackup' and trashed=false";
-  res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=5&fields=files(id,name,createdTime)&q=" + encodeURIComponent(q) + "&orderBy=createdTime desc", {
-    headers: { "Authorization": "Bearer " + googleAccessToken }
-  });
-  if(!res.ok) return null;
-  const data = await res.json();
-  return (data.files && data.files[0]) ? data.files[0].id : null;
+  return null;
 }
 
 async function driveUploadBackup(){
@@ -1017,6 +1030,7 @@ async function driveUploadBackup(){
   try{
     msg("Đang sao lưu lên Drive (ghi đè)...");
     const v = await readVault();
+    if(!v) throw new Error("Không có dữ liệu để sao lưu");
     const payload = {
       format: BACKUP_FORMAT,
       formatVersion: 1,
@@ -1036,14 +1050,18 @@ async function driveUploadBackup(){
         },
         body: content
       });
-      if(!res.ok) throw new Error(await res.text());
+      if(!res.ok){
+        const t = await res.text();
+        throw new Error(t || ("HTTP " + res.status));
+      }
       msg("Đã ghi đè bản sao lưu trên Google Drive.");
     }else{
+      // multipart create
       const metadata = { name: fixedName, mimeType: "application/json" };
-      const boundary = "-------pfbackupboundary";
-      const delimiter = "\r\n--" + boundary + "\r\n";
-      const closeDelim = "\r\n--" + boundary + "--";
-      const body = delimiter + "Content-Type: application/json; charset=UTF-8\r\n\r\n" + JSON.stringify(metadata) + delimiter + "Content-Type: application/json\r\n\r\n" + content + closeDelim;
+      const boundary = "pfboundary" + Date.now();
+      const body = "--" + boundary + "\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n" +
+        JSON.stringify(metadata) + "\r\n--" + boundary + "\r\nContent-Type: application/json\r\n\r\n" +
+        content + "\r\n--" + boundary + "--";
       const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name", {
         method: "POST",
         headers: {
@@ -1052,17 +1070,22 @@ async function driveUploadBackup(){
         },
         body: body
       });
-      if(!res.ok) throw new Error(await res.text());
+      if(!res.ok){
+        const t = await res.text();
+        throw new Error(t || ("HTTP " + res.status));
+      }
       msg("Đã tạo bản sao lưu trên Google Drive.");
     }
   }catch(e){
     console.error(e);
-    msg("Sao lưu Drive thất bại: " + (e.message || e));
+    let m = e.message || String(e);
+    if(m.includes("401") || m.includes("Invalid Credentials")) m = "Token hết hạn. Hãy Đăng xuất rồi Đăng nhập Google lại.";
+    if(m.includes("403")) m = "Không có quyền Drive. Kiểm tra scope và đã bật Google Drive API.";
+    msg("Sao lưu Drive thất bại: " + m);
   }
 }
 
 async function driveListBackups(){
-  // Prefer the fixed latest file first
   let files = [];
   let q = "name = 'TaiChinhCaNhan_latest.pfbackup' and trashed=false";
   let res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=5&fields=files(id,name,createdTime)&q=" + encodeURIComponent(q), {
@@ -1073,7 +1096,7 @@ async function driveListBackups(){
     if(data.files) files = files.concat(data.files);
   }
   q = "name contains 'TaiChinhCaNhan_' and name contains '.pfbackup' and trashed=false";
-  res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=15&fields=files(id,name,createdTime)&q=" + encodeURIComponent(q) + "&orderBy=createdTime desc", {
+  res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=10&fields=files(id,name,createdTime)&q=" + encodeURIComponent(q) + "&orderBy=createdTime desc", {
     headers: { "Authorization": "Bearer " + googleAccessToken }
   });
   if(res.ok){
@@ -1090,26 +1113,24 @@ async function driveRestoreBackup(){
     msg("Đang tìm file sao lưu trên Drive...");
     const files = await driveListBackups();
     if(!files.length){
-      msg("Không tìm thấy file .pfbackup nào do app tạo trên Drive.");
+      msg("Không tìm thấy file .pfbackup trên Drive. Hãy sao lưu trước.");
       return;
     }
-    // Simple choose: latest, or prompt list
-    let listText = files.map((f,i)=>`${i+1}. ${f.name} (${(f.createdTime||"").slice(0,10)})`).join("\\n");
-    let choice = prompt("Chọn số thứ tự file muốn khôi phục:\\n\\n" + listText, "1");
+    let listText = files.map((f,i)=> (i+1) + ". " + f.name + " (" + ((f.createdTime||"").slice(0,10)) + ")").join("\n");
+    let choice = prompt("Chọn số thứ tự file muốn khôi phục:\n\n" + listText, "1");
     if(!choice) return;
     let idx = parseInt(choice,10) - 1;
     if(isNaN(idx) || idx<0 || idx>=files.length){ msg("Lựa chọn không hợp lệ."); return; }
-    const fileId = files[idx].id;
-    if(!confirm("Khôi phục sẽ thay thế toàn bộ dữ liệu hiện tại bằng file:\\n" + files[idx].name + "\\nTiếp tục?")) return;
+    if(!confirm("Khôi phục sẽ thay thế dữ liệu hiện tại bằng:\n" + files[idx].name + "\nTiếp tục?")) return;
 
-    const res = await fetch("https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media", {
+    const res = await fetch("https://www.googleapis.com/drive/v3/files/" + files[idx].id + "?alt=media", {
       headers: { "Authorization": "Bearer " + googleAccessToken }
     });
     if(!res.ok) throw new Error(await res.text());
     const text = await res.text();
     const p = JSON.parse(text);
-    if(p.format !== BACKUP_FORMAT || !p.vault?.ciphertext) throw new Error("File không hợp lệ.");
-    let pin = prompt("Nhập PIN/mật khẩu của file sao lưu:");
+    if(p.format !== BACKUP_FORMAT || !p.vault || !p.vault.ciphertext) throw new Error("File không hợp lệ.");
+    let pin = prompt("Nhập PIN của file sao lưu:");
     if(!pin) return;
     let k = await derive(pin, un64(p.vault.salt));
     let d = normalize(await dec(p.vault, k));
@@ -1126,38 +1147,47 @@ async function driveRestoreBackup(){
   }
 }
 
-// Wire Google buttons (call after DOM ready, in init or here)
-
 /* ========== BIOMETRIC (WebAuthn) ========== */
 const BIO_CRED_KEY = "pf_webauthn_cred";
+const BIO_PIN_KEY = "pf_bio_pin"; // stored only after explicit bio registration on this device
 
 function bioSupported(){
   return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.create);
 }
 
 function updateBioUI(){
-  const has = !!localStorage.getItem(BIO_CRED_KEY);
-  if($("bioStatus")) $("bioStatus").textContent = has ? "Đã đăng ký vân tay / Face ID trên thiết bị này." : "Chưa đăng ký sinh trắc học.";
+  const has = !!localStorage.getItem(BIO_CRED_KEY) && !!localStorage.getItem(BIO_PIN_KEY);
+  if($("bioStatus")) $("bioStatus").textContent = has
+    ? "Đã đăng ký vân tay / Face ID. Có thể mở khóa không cần gõ PIN."
+    : "Chưa đăng ký sinh trắc học.";
   if($("bioUnlockBtn")) $("bioUnlockBtn").classList.toggle("hidden", !has || !bioSupported());
-  if($("bioRegisterBtn")) $("bioRegisterBtn").disabled = !bioSupported();
+  if($("bioRegisterBtn")) $("bioRegisterBtn").disabled = !bioSupported() || !cryptoKey;
+  if($("bioRemoveBtn")) $("bioRemoveBtn").disabled = !has;
 }
 
 async function bioRegister(){
   if(!bioSupported()){ msg("Thiết bị hoặc trình duyệt không hỗ trợ vân tay / Face ID."); return; }
-  if(!cryptoKey){ msg("Hãy mở khóa app bằng PIN trước khi đăng ký sinh trắc học."); return; }
+  if(!cryptoKey){ msg("Hãy mở khóa app bằng PIN trước khi đăng ký."); return; }
+  let pin = prompt("Nhập lại PIN hiện tại để liên kết với vân tay / Face ID:");
+  if(!pin) return;
+  // Verify PIN by trying derive + decrypt vault
   try{
-    // Create a random user id and challenge
+    let v = await readVault();
+    if(!v) throw new Error("Không có dữ liệu");
+    let k = await derive(pin, un64(v.salt));
+    await dec(v, k); // will throw if wrong
+  }catch(e){
+    msg("PIN không đúng. Không thể đăng ký sinh trắc học.");
+    return;
+  }
+  try{
     const userId = crypto.getRandomValues(new Uint8Array(16));
     const challenge = crypto.getRandomValues(new Uint8Array(32));
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge,
-        rp: { name: "Tài chính cá nhân", id: location.hostname },
-        user: {
-          id: userId,
-          name: "local-user",
-          displayName: "Người dùng local"
-        },
+        rp: { name: "Tài chính cá nhân", id: location.hostname || "localhost" },
+        user: { id: userId, name: "local-user", displayName: "Người dùng local" },
         pubKeyCredParams: [
           { type: "public-key", alg: -7 },
           { type: "public-key", alg: -257 }
@@ -1172,13 +1202,12 @@ async function bioRegister(){
       }
     });
     if(!cred) throw new Error("Không tạo được credential");
-    // Store credential id (base64)
     const rawId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId)));
     localStorage.setItem(BIO_CRED_KEY, rawId);
-    // We still rely on PIN-derived key stored only in memory; biometric just gates unlock UI.
-    // For stronger binding one would wrap the cryptoKey, but that requires more complex key storage.
+    // Store PIN for this device only; gated by successful biometric assertion
+    localStorage.setItem(BIO_PIN_KEY, btoa(unescape(encodeURIComponent(pin))));
     updateBioUI();
-    msg("Đã đăng ký vân tay / Face ID. Lần sau có thể dùng để mở khóa.");
+    msg("Đã đăng ký vân tay / Face ID. Lần sau mở app chỉ cần sinh trắc học.");
   }catch(e){
     console.error(e);
     msg("Đăng ký sinh trắc học thất bại: " + (e.message || e.name || e));
@@ -1188,8 +1217,10 @@ async function bioRegister(){
 async function bioUnlock(){
   if(!bioSupported()){ msg("Thiết bị không hỗ trợ."); return; }
   const stored = localStorage.getItem(BIO_CRED_KEY);
-  if(!stored){ msg("Chưa đăng ký sinh trắc học."); return; }
+  const encPin = localStorage.getItem(BIO_PIN_KEY);
+  if(!stored || !encPin){ msg("Chưa đăng ký sinh trắc học."); return; }
   try{
+    $("unlockError").textContent = "";
     const challenge = crypto.getRandomValues(new Uint8Array(32));
     const rawId = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
     const assertion = await navigator.credentials.get({
@@ -1201,25 +1232,24 @@ async function bioUnlock(){
       }
     });
     if(!assertion) throw new Error("Xác thực thất bại");
-    // Biometric passed. We still need the PIN because the encryption key is derived from PIN.
-    // Ask for PIN after successful bio (or store a wrapped key - simplified here: prompt PIN once after bio).
-    // Better UX: after bio success, if we have a session hint, but for security we prompt PIN.
-    // Alternative simple approach used by many apps: bio just confirms presence, then use last PIN? No.
-    // Practical approach: after successful bio, show PIN field focused, or auto-try if user stored PIN (not recommended).
-    // Here: after bio OK, prompt for PIN once.
-    let pin = prompt("Xác thực sinh trắc học thành công. Nhập PIN để mở dữ liệu:");
-    if(!pin) return;
+    // Biometric OK → unlock with stored PIN automatically
+    const pin = decodeURIComponent(escape(atob(encPin)));
     await unlock(pin);
-    msg("Đã mở khóa bằng sinh trắc học + PIN.");
+    msg("Đã mở khóa bằng vân tay / Face ID.");
   }catch(e){
     console.error(e);
-    if(e.name === "NotAllowedError") msg("Bạn đã hủy hoặc sinh trắc học không khớp.");
-    else msg("Mở khóa sinh trắc học thất bại: " + (e.message || e.name));
+    if(e.name === "NotAllowedError") {
+      $("unlockError").textContent = "Đã hủy hoặc sinh trắc học không khớp.";
+    } else {
+      $("unlockError").textContent = "Mở khóa sinh trắc học thất bại.";
+      msg("Mở khóa thất bại: " + (e.message || e.name));
+    }
   }
 }
 
 function bioRemove(){
   localStorage.removeItem(BIO_CRED_KEY);
+  localStorage.removeItem(BIO_PIN_KEY);
   updateBioUI();
   msg("Đã hủy đăng ký sinh trắc học trên thiết bị này.");
 }
@@ -1229,7 +1259,7 @@ function wireGoogleButtons(){
     $("saveClientIdBtn").onclick = ()=>{
       const id = ($("googleClientId").value || "").trim();
       if(!id || !id.includes(".apps.googleusercontent.com")){
-        msg("Client ID không hợp lệ.");
+        msg("Client ID không hợp lệ. Phải dạng xxxxx.apps.googleusercontent.com");
         return;
       }
       localStorage.setItem("pf_google_client_id", id);
@@ -1241,11 +1271,11 @@ function wireGoogleButtons(){
   if($("googleLogoutBtn")) $("googleLogoutBtn").onclick = googleLogout;
   if($("driveBackupBtn")) $("driveBackupBtn").onclick = ()=>driveUploadBackup();
   if($("driveRestoreBtn")) $("driveRestoreBtn").onclick = ()=>driveRestoreBackup();
-  // Biometric
   if($("bioRegisterBtn")) $("bioRegisterBtn").onclick = bioRegister;
   if($("bioRemoveBtn")) $("bioRemoveBtn").onclick = bioRemove;
   if($("bioUnlockBtn")) $("bioUnlockBtn").onclick = bioUnlock;
   updateBioUI();
+  updateGoogleUI();
 }
 
 async function init(){
