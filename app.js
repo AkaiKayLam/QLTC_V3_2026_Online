@@ -1394,39 +1394,50 @@ function bioRemove(){
 }
 
 
+
 /* ========== CALCULATOR ========== */
 let calcTargetId = null;
 let calcExpr = "";
 let calcResult = 0;
 
 function openCalculator(targetId){
+  const modal = $("calcModal");
+  if(!modal){
+    msg("Không tìm thấy máy tính. Hãy tải lại trang (Ctrl+F5).");
+    return;
+  }
   calcTargetId = targetId;
   const el = $(targetId);
   const seed = el ? digits(el.value) : "";
   calcExpr = seed || "";
   calcResult = seed ? Number(seed) : 0;
   updateCalcDisplay();
-  $("calcModal").classList.remove("hidden");
+  modal.classList.remove("hidden");
 }
 
 function closeCalculator(){
-  $("calcModal").classList.add("hidden");
+  const modal = $("calcModal");
+  if(modal) modal.classList.add("hidden");
   calcTargetId = null;
 }
 
 function updateCalcDisplay(){
   if($("calcExpr")) $("calcExpr").textContent = calcExpr || "";
-  if($("calcValue")) $("calcValue").textContent = fmt(Math.round(Math.abs(calcResult)) || 0);
+  if($("calcValue")){
+    try{
+      const v = calcExpr ? calcEval(calcExpr) : calcResult;
+      $("calcValue").textContent = fmt(Math.round(Math.abs(Number(v)||0)));
+    }catch(e){
+      $("calcValue").textContent = calcExpr || "0";
+    }
+  }
 }
 
 function calcEval(expr){
-  // Safe eval of + - * / % and parentheses-free simple expression
   expr = String(expr||"").replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-").replace(/\s/g,"");
   if(!expr) return 0;
-  if(!/^[\d.+\-*/%]+$/.test(expr)) throw new Error("Biểu thức không hợp lệ");
-  // percent: 50% -> 0.5? or treat as /100 of previous - simple: N% => N/100
+  if(!/^[\d.+\-*/%()]+$/.test(expr)) throw new Error("Biểu thức không hợp lệ");
   expr = expr.replace(/(\d+(\.\d+)?)%/g, "($1/100)");
-  // eslint-disable-next-line no-new-func
   const v = Function('"use strict"; return (' + expr + ')')();
   if(typeof v !== "number" || !isFinite(v)) throw new Error("Kết quả không hợp lệ");
   return v;
@@ -1439,19 +1450,17 @@ function calcPress(k){
       calcResult = 0;
     }else if(k === "⌫"){
       calcExpr = calcExpr.slice(0, -1);
-      try{ calcResult = calcExpr ? calcEval(calcExpr) : 0; }catch(e){ /* keep last */ }
     }else if(k === "="){
       calcResult = calcEval(calcExpr || "0");
       calcExpr = String(Math.round(calcResult));
     }else{
-      // prevent two operators in a row
       if("+-*/".includes(k) && calcExpr && "+-*/".includes(calcExpr.slice(-1))){
         calcExpr = calcExpr.slice(0, -1) + k;
       }else{
         calcExpr += k;
       }
-      try{ calcResult = calcEval(calcExpr); }catch(e){ /* incomplete expr ok */ }
     }
+    try{ calcResult = calcEval(calcExpr || "0"); }catch(e){}
     updateCalcDisplay();
   }catch(e){
     msg(e.message || "Lỗi máy tính");
@@ -1461,7 +1470,7 @@ function calcPress(k){
 function calcApply(){
   try{
     const v = Math.round(Math.abs(calcEval(calcExpr || String(calcResult) || "0")));
-    if(!calcTargetId) return closeCalculator();
+    if(!calcTargetId){ closeCalculator(); return; }
     const el = $(calcTargetId);
     if(el){
       el.value = fmt(v);
@@ -1474,21 +1483,28 @@ function calcApply(){
 }
 
 function wireCalculator(){
-  document.querySelectorAll(".calc-btn").forEach(btn=>{
-    btn.onclick = (e)=>{
+  if(window.__calcWired) return;
+  window.__calcWired = true;
+  document.addEventListener("click", (e)=>{
+    const calcBtn = e.target.closest && e.target.closest(".calc-btn");
+    if(calcBtn){
       e.preventDefault();
       e.stopPropagation();
-      openCalculator(btn.getAttribute("data-calc-target"));
-    };
+      openCalculator(calcBtn.getAttribute("data-calc-target"));
+      return;
+    }
+    const modal = $("calcModal");
+    if(!modal || modal.classList.contains("hidden")) return;
+    const key = e.target.closest && e.target.closest(".calc-key");
+    if(key){
+      e.preventDefault();
+      calcPress(key.getAttribute("data-k"));
+      return;
+    }
+    if(e.target.id === "calcCancel"){ e.preventDefault(); closeCalculator(); return; }
+    if(e.target.id === "calcApply"){ e.preventDefault(); calcApply(); return; }
+    if(e.target.id === "calcModal"){ closeCalculator(); }
   });
-  if($("calcCancel")) $("calcCancel").onclick = closeCalculator;
-  if($("calcApply")) $("calcApply").onclick = calcApply;
-  if($("calcModal")){
-    $("calcModal").onclick = (e)=>{ if(e.target.id === "calcModal") closeCalculator(); };
-    $("calcModal").querySelectorAll(".calc-key").forEach(btn=>{
-      btn.onclick = ()=> calcPress(btn.getAttribute("data-k"));
-    });
-  }
 }
 
 function wireGoogleButtons(){
