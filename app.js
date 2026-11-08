@@ -28,6 +28,17 @@ const DEFAULT_CATS={
   ]
 };
 
+const CATEGORY_GROUPS = {
+  "Thu nhập": { type: "INCOME", children: null }, // null = use all income cats
+  "Chi tiêu thiết yếu": { type: "EXPENSE", children: ["Đi chợ siêu thị","Ăn uống","Hóa đơn","Tiền nhà","Đi lại","Giúp việc","Chi tiêu thiết yếu khác"] },
+  "Mua sắm giải trí": { type: "EXPENSE", children: ["Vui chơi giải trí","Mua sắm","Làm đẹp","Thể thao","Đồ gia dụng","Mua sắm giải trí khác"] },
+  "Giáo dục, Y tế, Bảo hiểm": { type: "EXPENSE", children: ["Giáo dục","Y tế","Bảo hiểm","Giáo dục Y tế Bảo hiểm khác"] },
+  "Tiết kiệm": { type: "EXPENSE", children: ["Mở/Nộp tiền tiết kiệm"] },
+  "Đầu tư": { type: "EXPENSE", children: ["Chứng khoán","Bất động sản","Quỹ","Con cái","Bố mẹ","Đầu tư khác"] },
+  "Chi khác": { type: "EXPENSE", children: ["Sự kiện","Biếu tặng","Dịch vụ công","Chi khác","Cho vay","Trả nợ"] }
+};
+
+
 function openDb(){return new Promise((res,rej)=>{let r=indexedDB.open(DB_NAME,1);r.onupgradeneeded=()=>r.result.createObjectStore(STORE);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function readVault(){return new Promise((res,rej)=>{let r=db.transaction(STORE).objectStore(STORE).get("main");r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error)})}
 function writeVault(v){return new Promise((res,rej)=>{let t=db.transaction(STORE,"readwrite");t.objectStore(STORE).put(v,"main");t.oncomplete=res;t.onerror=()=>rej(t.error)})}
@@ -488,36 +499,160 @@ function initStatsDates(){
   if($("statsFrom") && !$("statsFrom").value) $("statsFrom").value=`${y}-${m}-01`;
   if($("statsTo") && !$("statsTo").value) $("statsTo").value=`${y}-${m}-${String(last).padStart(2,"0")}`;
   if($("statsYear") && !$("statsYear").value) $("statsYear").value=y;
+  fillStatsParentOptions();
+  updateStatsModeUI();
 }
+
+function fillStatsParentOptions(){
+  const sel = $("statsParent");
+  if(!sel) return;
+  const cur = sel.value || "ALL";
+  let html = '<option value="ALL">Tất cả danh mục</option>';
+  for(const name of Object.keys(CATEGORY_GROUPS)){
+    html += `<option value="${esc(name)}">${esc(name)}</option>`;
+  }
+  sel.innerHTML = html;
+  if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+  fillStatsChildOptions();
+}
+
+function fillStatsChildOptions(){
+  const parent = $("statsParent")?.value || "ALL";
+  const sel = $("statsChild");
+  if(!sel) return;
+  const cur = sel.value || "ALL";
+  let html = '<option value="ALL">Tất cả hạng mục con</option>';
+  if(parent !== "ALL" && CATEGORY_GROUPS[parent]){
+    const g = CATEGORY_GROUPS[parent];
+    let children = g.children;
+    if(children === null){
+      // Thu nhập: lấy toàn bộ danh mục thu hiện có
+      children = appData.categories.INCOME || [];
+    }
+    // chỉ hiện những hạng mục còn tồn tại trong app
+    const pool = g.type === "INCOME" ? (appData.categories.INCOME||[]) : (appData.categories.EXPENSE||[]);
+    for(const c of children){
+      if(pool.includes(c) || (appData.categories.INCOME||[]).includes(c) || (appData.categories.EXPENSE||[]).includes(c)){
+        html += `<option value="${esc(c)}">${esc(c)}</option>`;
+      }
+    }
+  }else if(parent === "ALL"){
+    // tất cả hạng mục con của mọi nhóm
+    const seen = new Set();
+    for(const [name,g] of Object.entries(CATEGORY_GROUPS)){
+      let children = g.children;
+      if(children === null) children = appData.categories.INCOME || [];
+      for(const c of children){
+        if(!seen.has(c)){
+          seen.add(c);
+          html += `<option value="${esc(c)}">${esc(c)}</option>`;
+        }
+      }
+    }
+  }
+  sel.innerHTML = html;
+  if([...sel.options].some(o=>o.value===cur)) sel.value = cur;
+  else sel.value = "ALL";
+}
+
+function updateStatsModeUI(){
+  const mode = $("statsMode")?.value || "range";
+  const isYear = mode === "year";
+  const isAll = mode === "all";
+  if($("statsYearWrap")) $("statsYearWrap").classList.toggle("hidden", !isYear);
+  if($("statsFromWrap")) $("statsFromWrap").classList.toggle("hidden", isYear || isAll);
+  if($("statsToWrap")) $("statsToWrap").classList.toggle("hidden", isYear || isAll);
+}
+
+function getStatsDateRange(){
+  const mode = $("statsMode").value;
+  if(mode === "all"){
+    const dates = appData.transactions
+      .filter(t => t.type === "INCOME" || t.type === "EXPENSE")
+      .map(t => t.date)
+      .filter(Boolean)
+      .sort();
+    if(!dates.length) return { from: today(), to: today(), label: "Chưa có giao dịch" };
+    return { from: dates[0], to: today(), label: `Từ ${dates[0]} đến ${today()}` };
+  }
+  if(mode === "year"){
+    const y = $("statsYear").value || new Date().getFullYear();
+    return { from: `${y}-01-01`, to: `${y}-12-31`, label: `Năm ${y}` };
+  }
+  const from = $("statsFrom").value;
+  const to = $("statsTo").value;
+  return { from, to, label: (from && to) ? `Từ ${from} đến ${to}` : "" };
+}
+
+function getStatsCategoryFilter(){
+  const parent = $("statsParent")?.value || "ALL";
+  const child = $("statsChild")?.value || "ALL";
+  if(child !== "ALL"){
+    // một hạng mục con cụ thể
+    return { categories: [child], parentLabel: parent === "ALL" ? child : parent, childLabel: child };
+  }
+  if(parent !== "ALL" && CATEGORY_GROUPS[parent]){
+    const g = CATEGORY_GROUPS[parent];
+    let children = g.children;
+    if(children === null) children = [...(appData.categories.INCOME||[])];
+    return { categories: children, parentLabel: parent, childLabel: null };
+  }
+  return { categories: null, parentLabel: null, childLabel: null }; // all
+}
+
 function runStats(){
-  let mode=$("statsMode").value;
-  let from,to;
-  if(mode==="year"){
-    let y=$("statsYear").value||new Date().getFullYear();
-    from=`${y}-01-01`; to=`${y}-12-31`;
-  }else{
-    from=$("statsFrom").value; to=$("statsTo").value;
+  const range = getStatsDateRange();
+  if(!range.from || !range.to){ msg("Chọn khoảng ngày hợp lệ."); return; }
+  const filter = getStatsCategoryFilter();
+  let txs = appData.transactions.filter(t =>
+    (t.type === "INCOME" || t.type === "EXPENSE") &&
+    t.date >= range.from && t.date <= range.to
+  );
+  if(filter.categories){
+    const set = new Set(filter.categories);
+    txs = txs.filter(t => set.has(t.category));
   }
-  if(!from||!to){msg("Chọn khoảng ngày hợp lệ.");return}
-  let txs=appData.transactions.filter(t=>t.date>=from && t.date<=to && (t.type==="INCOME"||t.type==="EXPENSE"));
-  let exp={},inc={};
-  for(let t of txs){
-    if(t.type==="EXPENSE") exp[t.category]=(exp[t.category]||0)+t.amount;
-    else inc[t.category]=(inc[t.category]||0)+t.amount;
+  const exp = {}, inc = {};
+  let sumExp = 0, sumInc = 0;
+  for(const t of txs){
+    if(t.type === "EXPENSE"){
+      exp[t.category] = (exp[t.category]||0) + t.amount;
+      sumExp += t.amount;
+    }else{
+      inc[t.category] = (inc[t.category]||0) + t.amount;
+      sumInc += t.amount;
+    }
   }
-  function bars(map,cls){
-    let entries=Object.entries(map).sort((a,b)=>b[1]-a[1]);
-    if(!entries.length) return '<div class="empty">Không có dữ liệu.</div>';
-    let max=entries[0][1]||1;
-    return entries.map(([k,v])=>`<div class="chart-bar">
+  function bars(map, cls){
+    let entries = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+    if(!entries.length) return '<div class="empty">Không có dữ liệu trong bộ lọc.</div>';
+    const max = entries[0][1] || 1;
+    const total = entries.reduce((s,[,v])=>s+v, 0);
+    let html = entries.map(([k,v])=>`<div class="chart-bar">
       <div class="label" title="${esc(k)}">${esc(k)}</div>
       <div class="bar ${cls}"><i style="width:${Math.max(2,v/max*100)}%"></i></div>
       <div class="val">${money(v)}</div>
     </div>`).join("");
+    html += `<div style="margin-top:10px;font-size:13px;font-weight:700;text-align:right">Tổng: ${money(total)}</div>`;
+    return html;
   }
-  $("statsExpenseChart").innerHTML=bars(exp,"exp");
-  $("statsIncomeChart").innerHTML=bars(inc,"inc");
+  // Titles
+  let scope = range.label || "";
+  if(filter.parentLabel){
+    scope += (scope ? " · " : "") + filter.parentLabel;
+    if(filter.childLabel) scope += " → " + filter.childLabel;
+  }
+  if($("statsExpenseTitle")) $("statsExpenseTitle").textContent = "Chi tiêu" + (scope ? " (" + scope + ")" : "");
+  if($("statsIncomeTitle")) $("statsIncomeTitle").textContent = "Thu nhập" + (scope ? " (" + scope + ")" : "");
+  if($("statsSummary")) $("statsSummary").style.display = "grid";
+  if($("statsSumIncome")) $("statsSumIncome").textContent = money(sumInc);
+  if($("statsSumExpense")) $("statsSumExpense").textContent = money(sumExp);
+  $("statsExpenseChart").innerHTML = bars(exp, "exp");
+  $("statsIncomeChart").innerHTML = bars(inc, "inc");
+  if(!txs.length) msg("Không có giao dịch khớp bộ lọc.");
+  else msg("Đã cập nhật thống kê · " + (scope || "tất cả"));
 }
+
 
 /* EVENTS */
 $("setupForm").onsubmit=async e=>{
@@ -907,10 +1042,8 @@ $("repayForm").onsubmit=async e=>{
 };
 
 /* Stats */
-$("statsMode").onchange=()=>{
-  let y=$("statsMode").value==="year";
-  $("statsYearWrap").classList.toggle("hidden",!y);
-};
+$("statsMode").onchange=()=>updateStatsModeUI();
+if($("statsParent")) $("statsParent").onchange=()=>fillStatsChildOptions();
 $("statsRunBtn").onclick=runStats;
 
 /* Backup */

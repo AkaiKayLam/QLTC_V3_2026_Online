@@ -129,20 +129,40 @@
 
 <!-- THỐNG KÊ -->
 <section id="statsView" class="view hidden">
-  <div class="section-heading"><div><h2>Thống kê thu chi</h2><p>Theo danh mục trong khoảng thời gian</p></div></div>
+  <div class="section-heading"><div><h2>Thống kê thu chi</h2><p>Theo thời gian và danh mục mẹ / hạng mục con</p></div></div>
   <div class="panel form-grid">
-    <label>Từ ngày<input id="statsFrom" type="date"></label>
-    <label>Đến ngày<input id="statsTo" type="date"></label>
-    <label>Chế độ<select id="statsMode"><option value="range">Theo khoảng ngày</option><option value="year">Theo năm</option></select></label>
+    <label class="wide">Chế độ thời gian
+      <select id="statsMode">
+        <option value="range">Theo khoảng ngày</option>
+        <option value="year">Theo năm</option>
+        <option value="all">Toàn bộ thời gian</option>
+      </select>
+    </label>
+    <label id="statsFromWrap">Từ ngày<input id="statsFrom" type="date"></label>
+    <label id="statsToWrap">Đến ngày<input id="statsTo" type="date"></label>
     <label id="statsYearWrap" class="hidden">Năm<input id="statsYear" type="number" min="2020" max="2035" step="1"></label>
+    <label class="wide">Danh mục mẹ
+      <select id="statsParent">
+        <option value="ALL">Tất cả danh mục</option>
+      </select>
+    </label>
+    <label class="wide">Hạng mục con
+      <select id="statsChild">
+        <option value="ALL">Tất cả hạng mục con</option>
+      </select>
+    </label>
     <div class="form-actions wide"><button id="statsRunBtn" class="primary">Xem thống kê</button></div>
   </div>
+  <div id="statsSummary" class="debt-summary" style="display:none">
+    <article><span>Tổng thu (lọc)</span><strong id="statsSumIncome">0 ₫</strong></article>
+    <article><span>Tổng chi (lọc)</span><strong id="statsSumExpense">0 ₫</strong></article>
+  </div>
   <div class="chart-wrap">
-    <h3 style="margin:0 0 8px;font-size:14px">Chi tiêu theo danh mục</h3>
+    <h3 id="statsExpenseTitle" style="margin:0 0 8px;font-size:14px">Chi tiêu</h3>
     <div id="statsExpenseChart"></div>
   </div>
   <div class="chart-wrap">
-    <h3 style="margin:0 0 8px;font-size:14px">Thu nhập theo danh mục</h3>
+    <h3 id="statsIncomeTitle" style="margin:0 0 8px;font-size:14px">Thu nhập</h3>
     <div id="statsIncomeChart"></div>
   </div>
 </section>
