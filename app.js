@@ -197,7 +197,8 @@ function renderTransactions(){
         html += '<div class="list-row"><div class="grow"><b>Chuyển khoản <span class="transfer-tag">Chuyển</span></b><small>'
           +esc(accMap[t.accountId]||"?")+' → '+esc(accMap[t.toAccountId]||"?")
           +(t.note?(' · '+esc(t.note)):'')+'</small></div><strong class="amount">'+money(t.amount)
-          +'</strong><div class="actions"><button data-del-tx="'+t.id+'" class="tiny danger">Xóa</button></div></div>';
+          +'</strong><div class="actions"><button data-edit-tx="'+t.id+'" class="tiny">Sửa</button>'
+          +'<button data-del-tx="'+t.id+'" class="tiny danger">Xóa</button></div></div>';
       }else{
         const tag = t.debtId ? (' <span class="debt-tag '+(t.type==="INCOME"?"lend":"borrow")+'">Vay nợ</span>') : "";
         html += '<div class="list-row"><div class="grow"><b>'+esc(t.category)+tag+'</b><small>'
@@ -391,13 +392,23 @@ function showTxForm(t){
   $("transactionForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
-function showTransferForm(){
+function showTransferForm(t){
   $("transactionForm").classList.add("hidden");
   $("transferForm").classList.remove("hidden");
   fillTransferOptions();
-  $("tfDate").value=today();
-  $("tfAmount").value="";
-  $("tfNote").value="";
+  if(t){
+    $("tfFrom").value = t.accountId || "";
+    $("tfTo").value = t.toAccountId || "";
+    $("tfAmount").value = fmt(t.amount);
+    $("tfDate").value = t.date || today();
+    $("tfNote").value = t.note || "";
+    $("transferForm").dataset.editId = t.id;
+  }else{
+    $("tfDate").value=today();
+    $("tfAmount").value="";
+    $("tfNote").value="";
+    delete $("transferForm").dataset.editId;
+  }
   $("transferForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
@@ -563,7 +574,7 @@ $("transactionForm").onsubmit=async e=>{
     note:$("txNote").value.trim(),
     createdAt:new Date().toISOString()
   };
-  if(id) appData.transactions=appData.transactions.map(t=>t.id===id?{...t,...item}:t);
+  if(id) appData.transactions=appData.transactions.map(t=>t.id===id?{...t,...item, createdAt:t.createdAt||item.createdAt}:t);
   else appData.transactions.push(item);
   await persist();
   render();
@@ -574,7 +585,9 @@ $("transactionList").onclick=async e=>{
   let ed=e.target.dataset.editTx, del=e.target.dataset.delTx;
   if(ed){
     let t=appData.transactions.find(x=>x.id===ed);
-    if(t && t.type!=="TRANSFER") showTxForm(t);
+    if(!t) return;
+    if(t.type==="TRANSFER") showTransferForm(t);
+    else showTxForm(t);
     return;
   }
   if(del && confirm("Xóa giao dịch này?")){
@@ -590,7 +603,7 @@ $("loadMoreBtn").onclick=()=>{
 };
 
 /* Transfer */
-$("addTransferBtn").onclick=showTransferForm;
+$("addTransferBtn").onclick=()=>showTransferForm();
 $("cancelTransferBtn").onclick=()=>$("transferForm").classList.add("hidden");
 $("tfAmount").oninput=()=>moneyInput($("tfAmount"));
 $("transferForm").onsubmit=async e=>{
@@ -601,8 +614,9 @@ $("transferForm").onsubmit=async e=>{
   if(!ensureNotFuture(date)) return;
   if(from===to) return msg("Hai tài khoản phải khác nhau.");
   if(!Number.isSafeInteger(amount)||amount<=0) return msg("Số tiền phải lớn hơn 0.");
+  let editId = $("transferForm").dataset.editId;
   let item={
-    id:uid(),
+    id: editId || uid(),
     type:"TRANSFER",
     amount,
     date,
@@ -612,11 +626,16 @@ $("transferForm").onsubmit=async e=>{
     note:$("tfNote").value.trim(),
     createdAt:new Date().toISOString()
   };
-  appData.transactions.push(item);
+  if(editId){
+    appData.transactions = appData.transactions.map(t => t.id===editId ? {...t, ...item, createdAt: t.createdAt || item.createdAt} : t);
+  }else{
+    appData.transactions.push(item);
+  }
   await persist();
   render();
   $("transferForm").classList.add("hidden");
-  msg("Đã chuyển khoản thành công.");
+  delete $("transferForm").dataset.editId;
+  msg(editId ? "Đã cập nhật chuyển khoản." : "Đã chuyển khoản thành công.");
 };
 
 /* Accounts */
@@ -1293,19 +1312,30 @@ async function bioUnlock(){
     const rawId = Uint8Array.from(atob(stored), c => c.charCodeAt(0));
     const rpId = localStorage.getItem("pf_bio_rpid") || getRpId();
 
-    const assertion = await navigator.credentials.get({
-      publicKey: {
-        challenge,
-        rpId,
-        allowCredentials: [{
-          type: "public-key",
-          id: rawId,
-          transports: ["internal"]
-        }],
-        userVerification: "required",
-        timeout: 90000
-      }
-    });
+    let assertion;
+    try{
+      assertion = await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId,
+          allowCredentials: [{ type: "public-key", id: rawId, transports: ["internal"] }],
+          userVerification: "required",
+          timeout: 90000
+        }
+      });
+    }catch(err1){
+      // Fallback: omit rpId (some Android Chrome builds)
+      if(err1 && (err1.name==="SecurityError" || err1.name==="NotAllowedError")){
+        assertion = await navigator.credentials.get({
+          publicKey: {
+            challenge,
+            allowCredentials: [{ type: "public-key", id: rawId, transports: ["internal"] }],
+            userVerification: "required",
+            timeout: 90000
+          }
+        });
+      }else throw err1;
+    }
     if(!assertion) throw new Error("Xác thực thất bại");
 
     const pin = decodeURIComponent(escape(atob(encPin)));

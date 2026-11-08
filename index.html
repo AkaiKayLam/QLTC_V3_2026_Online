@@ -21,9 +21,12 @@
 <section id="setupPanel" class="panel narrow hidden"><h2>Tạo kho dữ liệu</h2><p>Đặt PIN số từ 4 chữ số trở lên. PIN dùng để mã hóa dữ liệu trên thiết bị. Nếu quên PIN, không thể giải mã dữ liệu nếu không có bản sao lưu và PIN đúng.</p>
 <form id="setupForm"><label>PIN chính<div class="input-wrap"><input id="setupPassword" type="password" inputmode="numeric" pattern="[0-9]{4,}" minlength="4" autocomplete="new-password" required placeholder="Ít nhất 4 chữ số"><button type="button" class="peek" data-target="setupPassword">Hiện</button><button type="button" class="clear" data-target="setupPassword">×</button></div></label>
 <label>Nhập lại PIN<div class="input-wrap"><input id="setupPassword2" type="password" inputmode="numeric" pattern="[0-9]{4,}" minlength="4" required><button type="button" class="peek" data-target="setupPassword2">Hiện</button><button type="button" class="clear" data-target="setupPassword2">×</button></div></label><button class="primary">Tạo kho dữ liệu</button></form></section>
-<section id="unlockPanel" class="panel narrow hidden"><h2>Mở khóa</h2><form id="unlockForm"><label>PIN<div class="input-wrap"><input id="unlockPassword" type="password" inputmode="numeric" autocomplete="current-password" required><button type="button" class="peek" data-target="unlockPassword">Hiện</button><button type="button" class="clear" data-target="unlockPassword">×</button></div></label><button class="primary">Mở khóa</button></form>
-<button type="button" id="bioUnlockBtn" class="primary hidden" style="width:100%;margin-top:10px">🔐 Mở bằng vân tay / Face ID</button>
-<p id="unlockError" class="error"></p></section>
+<section id="unlockPanel" class="panel narrow hidden"><h2>Mở khóa</h2>
+<button type="button" id="bioUnlockBtn" class="primary hidden" style="width:100%;margin-bottom:12px;padding:14px">🔐 Mở bằng vân tay / Face ID</button>
+<form id="unlockForm"><label>PIN<div class="input-wrap"><input id="unlockPassword" type="password" inputmode="numeric" autocomplete="current-password" required><button type="button" class="peek" data-target="unlockPassword">Hiện</button><button type="button" class="clear" data-target="unlockPassword">×</button></div></label><button class="primary">Mở khóa bằng PIN</button></form>
+<p id="unlockError" class="error"></p>
+<p style="font-size:11px;color:#6a7775;margin-top:8px">Chưa có vân tay? Mở bằng PIN, vào <b>Sao lưu - Cài đặt</b> để đăng ký.</p>
+</section>
 <section id="appPanel" class="hidden">
 <div class="summary-grid">
   <article><span>Tổng thu</span><strong id="incomeTotal">0 ₫</strong></article>
