@@ -1201,20 +1201,23 @@ function getRpId(){
 function updateBioUI(){
   const has = !!localStorage.getItem(BIO_CRED_KEY) && !!localStorage.getItem(BIO_PIN_KEY);
   const secure = !!window.isSecureContext;
+  const tog = $("bioToggle");
+  if(tog){
+    tog.checked = has;
+    tog.disabled = !secure || !bioSupported();
+  }
   if($("bioStatus")){
     if(!secure){
-      $("bioStatus").textContent = "Cần HTTPS hoặc localhost mới dùng vân tay được.";
+      $("bioStatus").textContent = "Cần HTTPS (GitHub Pages / app đã cài) mới dùng vân tay được.";
     }else if(!bioSupported()){
       $("bioStatus").textContent = "Trình duyệt không hỗ trợ WebAuthn.";
     }else if(has){
-      $("bioStatus").textContent = "Đã đăng ký vân tay / Face ID — mở khóa không cần gõ PIN.";
+      $("bioStatus").textContent = "Đang bật — có thể mở khóa bằng vân tay / Face ID của máy này.";
     }else{
-      $("bioStatus").textContent = "Chưa đăng ký. Mở khóa bằng PIN trước, rồi bấm Đăng ký.";
+      $("bioStatus").textContent = "Đang tắt. Bật công tắc (cần đang mở khóa bằng PIN) để đồng bộ với máy.";
     }
   }
   if($("bioUnlockBtn")) $("bioUnlockBtn").classList.toggle("hidden", !has || !secure);
-  if($("bioRegisterBtn")) $("bioRegisterBtn").disabled = !secure || !bioSupported() || !cryptoKey;
-  if($("bioRemoveBtn")) $("bioRemoveBtn").disabled = !has;
 }
 
 async function bioRegister(){
@@ -1284,7 +1287,7 @@ async function bioRegister(){
     localStorage.setItem("pf_bio_rpid", rpId);
 
     updateBioUI();
-    msg("Đăng ký vân tay / Face ID thành công. Lần sau chỉ cần chạm vân tay.");
+    msg("Đã bật mở khóa vân tay / Face ID cho máy này.");
   }catch(e){
     console.error("bioRegister", e);
     let m = e.message || e.name || String(e);
@@ -1354,12 +1357,138 @@ async function bioUnlock(){
   }
 }
 
+
+async function bioToggleChanged(){
+  const tog = $("bioToggle");
+  if(!tog) return;
+  if(tog.checked){
+    // Turn ON → register with current device
+    if(!cryptoKey){
+      tog.checked = false;
+      msg("Hãy mở khóa bằng PIN trước, rồi bật lại.");
+      return;
+    }
+    try{
+      await bioRegister();
+      // bioRegister sets storage on success; if failed, storage empty
+      if(!localStorage.getItem(BIO_CRED_KEY)){
+        tog.checked = false;
+      }
+    }catch(e){
+      tog.checked = false;
+    }
+    updateBioUI();
+  }else{
+    // Turn OFF
+    bioRemove();
+    updateBioUI();
+  }
+}
+
 function bioRemove(){
   localStorage.removeItem(BIO_CRED_KEY);
   localStorage.removeItem(BIO_PIN_KEY);
   localStorage.removeItem("pf_bio_rpid");
   updateBioUI();
-  msg("Đã hủy đăng ký vân tay / Face ID.");
+  msg("Đã tắt mở khóa vân tay / Face ID.");
+}
+
+
+/* ========== CALCULATOR ========== */
+let calcTargetId = null;
+let calcExpr = "";
+let calcResult = 0;
+
+function openCalculator(targetId){
+  calcTargetId = targetId;
+  const el = $(targetId);
+  const seed = el ? digits(el.value) : "";
+  calcExpr = seed || "";
+  calcResult = seed ? Number(seed) : 0;
+  updateCalcDisplay();
+  $("calcModal").classList.remove("hidden");
+}
+
+function closeCalculator(){
+  $("calcModal").classList.add("hidden");
+  calcTargetId = null;
+}
+
+function updateCalcDisplay(){
+  if($("calcExpr")) $("calcExpr").textContent = calcExpr || "";
+  if($("calcValue")) $("calcValue").textContent = fmt(Math.round(Math.abs(calcResult)) || 0);
+}
+
+function calcEval(expr){
+  // Safe eval of + - * / % and parentheses-free simple expression
+  expr = String(expr||"").replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-").replace(/\s/g,"");
+  if(!expr) return 0;
+  if(!/^[\d.+\-*/%]+$/.test(expr)) throw new Error("Biểu thức không hợp lệ");
+  // percent: 50% -> 0.5? or treat as /100 of previous - simple: N% => N/100
+  expr = expr.replace(/(\d+(\.\d+)?)%/g, "($1/100)");
+  // eslint-disable-next-line no-new-func
+  const v = Function('"use strict"; return (' + expr + ')')();
+  if(typeof v !== "number" || !isFinite(v)) throw new Error("Kết quả không hợp lệ");
+  return v;
+}
+
+function calcPress(k){
+  try{
+    if(k === "C"){
+      calcExpr = "";
+      calcResult = 0;
+    }else if(k === "⌫"){
+      calcExpr = calcExpr.slice(0, -1);
+      try{ calcResult = calcExpr ? calcEval(calcExpr) : 0; }catch(e){ /* keep last */ }
+    }else if(k === "="){
+      calcResult = calcEval(calcExpr || "0");
+      calcExpr = String(Math.round(calcResult));
+    }else{
+      // prevent two operators in a row
+      if("+-*/".includes(k) && calcExpr && "+-*/".includes(calcExpr.slice(-1))){
+        calcExpr = calcExpr.slice(0, -1) + k;
+      }else{
+        calcExpr += k;
+      }
+      try{ calcResult = calcEval(calcExpr); }catch(e){ /* incomplete expr ok */ }
+    }
+    updateCalcDisplay();
+  }catch(e){
+    msg(e.message || "Lỗi máy tính");
+  }
+}
+
+function calcApply(){
+  try{
+    const v = Math.round(Math.abs(calcEval(calcExpr || String(calcResult) || "0")));
+    if(!calcTargetId) return closeCalculator();
+    const el = $(calcTargetId);
+    if(el){
+      el.value = fmt(v);
+      el.dispatchEvent(new Event("input", {bubbles:true}));
+    }
+    closeCalculator();
+  }catch(e){
+    msg("Không áp dụng được số này");
+  }
+}
+
+function wireCalculator(){
+  document.querySelectorAll(".calc-btn").forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      openCalculator(btn.getAttribute("data-calc-target"));
+    };
+  });
+  if($("calcCancel")) $("calcCancel").onclick = closeCalculator;
+  if($("calcApply")) $("calcApply").onclick = calcApply;
+  if($("calcModal")){
+    $("calcModal").onclick = (e)=>{ if(e.target.id === "calcModal") closeCalculator(); };
+    $("calcModal").querySelectorAll(".calc-key").forEach(btn=>{
+      btn.onclick = ()=> calcPress(btn.getAttribute("data-k"));
+    });
+  }
 }
 
 function wireGoogleButtons(){
@@ -1379,8 +1508,7 @@ function wireGoogleButtons(){
   if($("googleLogoutBtn")) $("googleLogoutBtn").onclick = googleLogout;
   if($("driveBackupBtn")) $("driveBackupBtn").onclick = ()=>driveUploadBackup();
   if($("driveRestoreBtn")) $("driveRestoreBtn").onclick = ()=>driveRestoreBackup();
-  if($("bioRegisterBtn")) $("bioRegisterBtn").onclick = bioRegister;
-  if($("bioRemoveBtn")) $("bioRemoveBtn").onclick = bioRemove;
+  if($("bioToggle")) $("bioToggle").onchange = bioToggleChanged;
   if($("bioUnlockBtn")) $("bioUnlockBtn").onclick = bioUnlock;
   updateBioUI();
   updateGoogleUI();

@@ -25,7 +25,7 @@
 <button type="button" id="bioUnlockBtn" class="primary hidden" style="width:100%;margin-bottom:12px;padding:14px">🔐 Mở bằng vân tay / Face ID</button>
 <form id="unlockForm"><label>PIN<div class="input-wrap"><input id="unlockPassword" type="password" inputmode="numeric" autocomplete="current-password" required><button type="button" class="peek" data-target="unlockPassword">Hiện</button><button type="button" class="clear" data-target="unlockPassword">×</button></div></label><button class="primary">Mở khóa bằng PIN</button></form>
 <p id="unlockError" class="error"></p>
-<p style="font-size:11px;color:#6a7775;margin-top:8px">Chưa có vân tay? Mở bằng PIN, vào <b>Sao lưu - Cài đặt</b> để đăng ký.</p>
+<p style="font-size:11px;color:#6a7775;margin-top:8px">Chưa bật vân tay? Mở bằng PIN, vào <b>Sao lưu - Cài đặt</b> rồi bật công tắc.</p>
 </section>
 <section id="appPanel" class="hidden">
 <div class="summary-grid">
@@ -73,7 +73,7 @@
     <h3 id="txFormTitle" class="wide">Thêm giao dịch</h3>
     <input id="txId" type="hidden">
     <label>Loại<select id="txType"><option value="EXPENSE">Chi tiêu</option><option value="INCOME">Thu nhập</option></select></label>
-    <label>Số tiền (VND)<div class="input-wrap"><input id="txAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 1.234.567"><button type="button" class="clear" data-target="txAmount">×</button></div></label>
+    <label>Số tiền (VND)<div class="input-wrap"><input id="txAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 1.234.567"><button type="button" class="calc-btn" data-calc-target="txAmount" title="Máy tính">⌨</button><button type="button" class="clear" data-target="txAmount">×</button></div></label>
     <label>Ngày<input id="txDate" type="date" required></label>
     <label>Tài khoản<select id="txAccount" required></select></label>
     <label>Danh mục<select id="txCategory" required></select></label>
@@ -84,7 +84,7 @@
     <h3 class="wide">Chuyển khoản giữa ví</h3>
     <label>Từ tài khoản<select id="tfFrom" required></select></label>
     <label>Sang tài khoản<select id="tfTo" required></select></label>
-    <label>Số tiền (VND)<div class="input-wrap"><input id="tfAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 500.000"><button type="button" class="clear" data-target="tfAmount">×</button></div></label>
+    <label>Số tiền (VND)<div class="input-wrap"><input id="tfAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 500.000"><button type="button" class="calc-btn" data-calc-target="tfAmount" title="Máy tính">⌨</button><button type="button" class="clear" data-target="tfAmount">×</button></div></label>
     <label>Ngày<input id="tfDate" type="date" required></label>
     <label class="wide">Ghi chú<input id="tfNote" maxlength="250" placeholder="Không bắt buộc"></label>
     <div class="form-actions wide"><button type="button" id="cancelTransferBtn" class="secondary">Hủy</button><button class="primary">Thực hiện chuyển</button></div>
@@ -108,7 +108,7 @@
     <input id="debtId" type="hidden">
     <label>Loại<select id="debtType"><option value="CHO_VAY">Cho vay (người khác nợ mình)</option><option value="VAY">Vay nợ (mình nợ người khác)</option></select></label>
     <label>Người liên quan<input id="debtPerson" required maxlength="80" placeholder="Tên người / tổ chức"></label>
-    <label>Số tiền (VND)<div class="input-wrap"><input id="debtAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 2.000.000"><button type="button" class="clear" data-target="debtAmount">×</button></div></label>
+    <label>Số tiền (VND)<div class="input-wrap"><input id="debtAmount" inputmode="numeric" autocomplete="off" required placeholder="Ví dụ: 2.000.000"><button type="button" class="calc-btn" data-calc-target="debtAmount" title="Máy tính">⌨</button><button type="button" class="clear" data-target="debtAmount">×</button></div></label>
     <label>Tài khoản ví liên quan<select id="debtAccount" required></select></label>
     <label>Ngày<input id="debtDate" type="date" required></label>
     <label class="wide">Ghi chú<input id="debtNote" maxlength="250" placeholder="Không bắt buộc"></label>
@@ -118,7 +118,7 @@
     <h3 class="wide">Ghi nhận trả / thu nợ</h3>
     <input id="repayDebtId" type="hidden">
     <p id="repayInfo" class="wide" style="margin:0;color:#5b6967;font-size:12px"></p>
-    <label>Số tiền trả/thu (VND)<div class="input-wrap"><input id="repayAmount" inputmode="numeric" autocomplete="off" required><button type="button" class="clear" data-target="repayAmount">×</button></div></label>
+    <label>Số tiền trả/thu (VND)<div class="input-wrap"><input id="repayAmount" inputmode="numeric" autocomplete="off" required><button type="button" class="calc-btn" data-calc-target="repayAmount" title="Máy tính">⌨</button><button type="button" class="clear" data-target="repayAmount">×</button></div></label>
     <label>Tài khoản ví<select id="repayAccount" required></select></label>
     <label>Ngày<input id="repayDate" type="date" required></label>
     <label class="wide">Ghi chú<input id="repayNote" maxlength="250" placeholder="Không bắt buộc"></label>
@@ -150,7 +150,7 @@
 <!-- HẠN MỨC -->
 <section id="budgetsView" class="view hidden">
   <div class="section-heading"><div><h2>Hạn mức chi tiêu</h2><p>Theo dõi ngân sách tháng hiện tại</p></div></div>
-  <form id="budgetForm" class="panel form-grid"><label>Danh mục<select id="budgetCategory"></select></label><label>Hạn mức tháng (VND)<input id="budgetAmount" inputmode="numeric" placeholder="Ví dụ: 5.000.000" required></label><div class="form-actions wide"><button class="primary">Lưu hạn mức</button></div></form>
+  <form id="budgetForm" class="panel form-grid"><label>Danh mục<select id="budgetCategory"></select></label><label>Hạn mức tháng (VND)<div class="input-wrap"><input id="budgetAmount" inputmode="numeric" placeholder="Ví dụ: 5.000.000" required><button type="button" class="calc-btn" data-calc-target="budgetAmount" title="Máy tính">⌨</button><button type="button" class="clear" data-target="budgetAmount">×</button></div></label><div class="form-actions wide"><button class="primary">Lưu hạn mức</button></div></form>
   <div id="budgetList" class="list panel"></div>
 </section>
 
@@ -208,13 +208,16 @@
     </details>
 
     <hr>
-    <h3>Đăng nhập sinh trắc học (vân tay / Face ID)</h3>
-    <p style="font-size:12px;color:#5b6967">Dùng vân tay hoặc Face ID của thiết bị để mở khóa nhanh (vẫn cần PIN lần đầu để đăng ký).</p>
-    <div class="btn-group" style="margin:10px 0">
-      <button type="button" id="bioRegisterBtn" class="primary">Đăng ký vân tay / Face ID</button>
-      <button type="button" id="bioRemoveBtn" class="secondary">Hủy đăng ký sinh trắc học</button>
+    <h3>Mở khóa bằng vân tay / Face ID</h3>
+    <p style="font-size:12px;color:#5b6967">Bật để dùng vân tay hoặc Face ID của điện thoại đang dùng. Tắt để chỉ mở bằng PIN.</p>
+    <div class="toggle-row">
+      <span>Bật mở khóa vân tay / Face ID</span>
+      <label class="switch">
+        <input type="checkbox" id="bioToggle">
+        <span class="slider"></span>
+      </label>
     </div>
-    <p id="bioStatus" style="font-size:12px;color:#5b6967;margin:4px 0"></p>
+    <p id="bioStatus" style="font-size:12px;color:#5b6967;margin:8px 0 0"></p>
 
     <hr>
     <h3>Thông tin</h3>
@@ -230,4 +233,40 @@
 </main>
 <footer>Phiên bản thử nghiệm · Hãy sao lưu định kỳ</footer>
 <script src="./app.js"></script>
+
+<div id="calcModal" class="calc-modal hidden">
+  <div class="calc-sheet">
+    <div class="calc-display">
+      <div id="calcExpr" class="calc-expr"></div>
+      <div id="calcValue" class="calc-value">0</div>
+    </div>
+    <div class="calc-keys">
+      <button type="button" data-k="C" class="calc-key muted">C</button>
+      <button type="button" data-k="⌫" class="calc-key muted">⌫</button>
+      <button type="button" data-k="%" class="calc-key muted">%</button>
+      <button type="button" data-k="/" class="calc-key op">÷</button>
+      <button type="button" data-k="7" class="calc-key">7</button>
+      <button type="button" data-k="8" class="calc-key">8</button>
+      <button type="button" data-k="9" class="calc-key">9</button>
+      <button type="button" data-k="*" class="calc-key op">×</button>
+      <button type="button" data-k="4" class="calc-key">4</button>
+      <button type="button" data-k="5" class="calc-key">5</button>
+      <button type="button" data-k="6" class="calc-key">6</button>
+      <button type="button" data-k="-" class="calc-key op">−</button>
+      <button type="button" data-k="1" class="calc-key">1</button>
+      <button type="button" data-k="2" class="calc-key">2</button>
+      <button type="button" data-k="3" class="calc-key">3</button>
+      <button type="button" data-k="+" class="calc-key op">+</button>
+      <button type="button" data-k="000" class="calc-key">000</button>
+      <button type="button" data-k="0" class="calc-key">0</button>
+      <button type="button" data-k="." class="calc-key">.</button>
+      <button type="button" data-k="=" class="calc-key eq">=</button>
+    </div>
+    <div class="calc-actions">
+      <button type="button" id="calcCancel" class="secondary">Đóng</button>
+      <button type="button" id="calcApply" class="primary">Dùng số này</button>
+    </div>
+  </div>
+</div>
+
 </body></html>

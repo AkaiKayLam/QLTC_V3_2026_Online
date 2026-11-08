@@ -148,3 +148,57 @@ footer {
 button, .tab, input, select {
   touch-action: manipulation;
 }
+
+/* Calculator */
+.calc-btn{
+  border:0;background:#e8f3f1;color:#075e58;border-radius:7px;
+  padding:6px 8px;font-weight:700;font-size:14px;cursor:pointer;line-height:1;
+}
+.calc-modal{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);
+  display:flex;align-items:flex-end;justify-content:center;
+  z-index:9999;padding:0;
+}
+.calc-modal.hidden{display:none!important}
+.calc-sheet{
+  width:100%;max-width:400px;background:#fff;
+  border-radius:18px 18px 0 0;padding:14px 14px 20px;
+  box-shadow:0 -4px 24px rgba(0,0,0,.15);
+}
+.calc-display{
+  background:#f1f7f6;border-radius:12px;padding:12px 14px;margin-bottom:12px;
+  min-height:64px;
+}
+.calc-expr{font-size:12px;color:#6a7775;min-height:16px;word-break:break-all}
+.calc-value{font-size:28px;font-weight:800;color:#17212b;text-align:right;margin-top:4px}
+.calc-keys{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+}
+.calc-key{
+  border:0;border-radius:12px;padding:14px 0;font-size:18px;font-weight:700;
+  background:#eef3f2;color:#17212b;cursor:pointer;
+}
+.calc-key.op{background:#dceeea;color:#075e58}
+.calc-key.eq{background:#087b72;color:#fff}
+.calc-key.muted{background:#e8eceb;color:#5b6967}
+.calc-actions{display:flex;gap:8px;margin-top:12px}
+.calc-actions button{flex:1}
+
+/* Toggle switch */
+.toggle-row{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 0;font-size:13px;font-weight:650;color:#3d4b49;
+}
+.switch{position:relative;display:inline-block;width:48px;height:28px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider{
+  position:absolute;cursor:pointer;inset:0;background:#cbd5d1;
+  transition:.2s;border-radius:28px;
+}
+.slider:before{
+  position:absolute;content:"";height:22px;width:22px;left:3px;bottom:3px;
+  background:#fff;transition:.2s;border-radius:50%;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);
+}
+.switch input:checked + .slider{background:#087b72}
+.switch input:checked + .slider:before{transform:translateX(20px)}
